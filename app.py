@@ -43,6 +43,17 @@ STYLE_INSTRUCTIONS = {
     ),
 }
 
+SUMMARY_FIELDS = [
+    ("objective", "Research objective"),
+    ("problem", "Problem statement"),
+    ("method", "Methodology"),
+    ("dataset", "Dataset"),
+    ("technologies", "Algorithms and technologies"),
+    ("results", "Main results"),
+    ("limitations", "Limitations"),
+    ("conclusion", "Conclusion"),
+]
+
 
 # ============================================================
 # STYLING
@@ -51,40 +62,142 @@ STYLE_INSTRUCTIONS = {
 st.markdown(
     """
 <style>
-    footer {visibility: hidden;}
-    .block-container {padding-top: 1.6rem; padding-bottom: 1rem; max-width: 1600px;}
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap');
 
-    /* Sidebar */
-    [data-testid="stSidebar"] .stButton button {
-        justify-content: flex-start;
-        text-align: left;
-        border-radius: 8px;
-    }
-    .pl-brand {font-size: 1.35rem; font-weight: 700; margin-bottom: 0;}
-    .pl-sub {opacity: .65; font-size: .85rem; margin-bottom: .5rem;}
-    .pl-label {font-size: .78rem; font-weight: 600; opacity: .65; margin: .9rem 0 .3rem 0;}
+:root {
+    --pl-accent: #2F5D8A;
+    --pl-ink: #1B2430;
+    --pl-mute: #66758a;
+    --pl-line: #D5DDE6;
+    --pl-card: #FFFFFF;
+    --pl-hl: #FFF3C4;
+}
 
-    /* Paper viewer */
-    .pl-para {
-        font-family: Georgia, "Times New Roman", serif;
-        font-size: 1.02rem;
-        line-height: 1.7;
-        padding: .35rem .8rem;
-        border-left: 3px solid rgba(128,128,128,.28);
-        margin-bottom: .2rem;
-    }
+/* ---------- Base ---------- */
+html, body, .stApp, .stMarkdown, .stButton button, .stChatInput textarea,
+[data-testid="stSidebar"] p, [data-testid="stSidebar"] span, label, input {
+    font-family: 'Public Sans', system-ui, sans-serif;
+}
+footer, [data-testid="stDecoration"] {display: none;}
+header[data-testid="stHeader"] {background: transparent;}
+.block-container {padding-top: 1.4rem; padding-bottom: 1rem; max-width: 1640px;}
 
-    /* Panels */
-    .pl-quote {
-        border-left: 3px solid #e0b43c;
-        padding: .15rem .8rem;
-        opacity: .8;
-        font-style: italic;
-        margin-bottom: .6rem;
-        font-size: .92rem;
-    }
-    .pl-title {font-size: 1.3rem; font-weight: 650; margin: 0;}
-    .pl-meta {opacity: .65; font-size: .88rem; margin-bottom: .2rem;}
+/* ---------- Buttons ---------- */
+.stButton button {
+    border-radius: 10px;
+    font-weight: 500;
+    transition: background .15s, border-color .15s;
+}
+
+/* ---------- Sidebar ---------- */
+[data-testid="stSidebar"] {border-right: 1px solid rgba(255,255,255,.06);}
+.pl-logo {display: flex; align-items: center; gap: .65rem; margin: .2rem 0 1rem 0;}
+.pl-logo-mark {
+    width: 34px; height: 34px; border-radius: 9px; background: #8DBDEB; color: #0F1B2D;
+    display: flex; align-items: center; justify-content: center;
+    font: 700 1.05rem 'Newsreader', Georgia, serif;
+}
+.pl-logo-name {font: 600 1.25rem 'Newsreader', Georgia, serif; line-height: 1.1;}
+.pl-logo-sub {font-size: .76rem; opacity: .6;}
+.pl-section {font-size: .78rem; font-weight: 600; opacity: .55; margin: 1.1rem 0 .35rem .15rem; letter-spacing: .02em;}
+
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {
+    background: transparent; border: 1px solid transparent; justify-content: flex-start; text-align: left;
+}
+[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {
+    background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.08);
+}
+[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
+    background: rgba(141,189,235,.16); color: #fff; border: 1px solid rgba(141,189,235,.4);
+    justify-content: flex-start; text-align: left;
+}
+.st-key-new_chat_btn button {
+    background: #8DBDEB !important; color: #0F1B2D !important; font-weight: 600;
+    border: none !important; justify-content: center !important;
+}
+.st-key-new_chat_btn button:hover {background: #A6CDF1 !important;}
+
+/* ---------- Header chips ---------- */
+.pl-title {font: 600 1.7rem 'Newsreader', Georgia, serif; margin: 0; line-height: 1.2; color: var(--pl-ink);}
+.pl-chips {display: flex; gap: .45rem; flex-wrap: wrap; margin: .5rem 0 .9rem 0;}
+.pl-chip {
+    background: #fff; border: 1px solid var(--pl-line); border-radius: 99px;
+    padding: .15rem .75rem; font-size: .8rem; color: var(--pl-mute);
+}
+.pl-chip.accent {background: var(--pl-accent); border-color: var(--pl-accent); color: #fff;}
+
+/* ---------- Containers as cards ---------- */
+.st-key-viewer_box, .st-key-assist_box {
+    background: var(--pl-card);
+    border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(20,35,60,.06), 0 6px 20px rgba(20,35,60,.05);
+}
+[data-testid="stVerticalBlockBorderWrapper"] {border-radius: 14px;}
+
+/* ---------- Paper viewer ---------- */
+.pl-page-tag {
+    font-size: .8rem; color: var(--pl-mute); border-bottom: 1px solid var(--pl-line);
+    padding-bottom: .4rem; margin-bottom: .6rem;
+}
+.pl-para {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 1.08rem; line-height: 1.75; color: var(--pl-ink);
+    padding: .4rem .85rem; border-left: 3px solid transparent; border-radius: 4px;
+    transition: background .15s, border-color .15s;
+}
+.pl-para:hover {background: var(--pl-hl); border-left-color: #E0B43C;}
+[class*="st-key-explain_"] button {
+    font-size: .8rem; padding: .15rem .5rem; min-height: 2rem;
+    background: #fff; color: var(--pl-accent); border: 1px solid var(--pl-line);
+}
+[class*="st-key-explain_"] button:hover {border-color: var(--pl-accent); background: #F2F7FC;}
+
+/* ---------- Segmented control ---------- */
+[data-testid="stSegmentedControl"] {width: 100%;}
+
+/* ---------- Chat ---------- */
+[data-testid="stChatMessage"] {
+    background: #F4F7FA; border: 1px solid #E3E9F0; border-radius: 12px; padding: .7rem .9rem;
+}
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    background: #E8F0F8; border-color: #D3E1EF;
+}
+[data-testid="stChatInput"] {border-radius: 14px;}
+.pl-quote {
+    border-left: 3px solid #E0B43C; background: var(--pl-hl); border-radius: 4px;
+    padding: .35rem .75rem; font: italic .92rem 'Newsreader', Georgia, serif;
+    color: #4b4430; margin-bottom: .5rem;
+}
+.pl-empty {text-align: center; padding: 1.2rem .5rem .6rem .5rem;}
+.pl-empty b {font: 600 1.15rem 'Newsreader', Georgia, serif;}
+.pl-empty span {display: block; color: var(--pl-mute); font-size: .88rem; margin-top: .2rem;}
+
+/* ---------- Overview & glossary cards ---------- */
+.pl-oneline {
+    background: var(--pl-accent); color: #fff; border-radius: 12px; padding: .9rem 1.1rem;
+    font: 500 1.05rem/1.5 'Newsreader', Georgia, serif; margin-bottom: .8rem;
+}
+.pl-field {border: 1px solid var(--pl-line); border-radius: 12px; padding: .65rem .9rem; margin-bottom: .55rem;}
+.pl-field-label {font-size: .78rem; font-weight: 600; color: var(--pl-accent); margin-bottom: .15rem;}
+.pl-field-text {font-size: .93rem; line-height: 1.55; color: var(--pl-ink);}
+.pl-term {border-bottom: 1px solid var(--pl-line); padding: .55rem .2rem;}
+.pl-term b {font-size: .95rem;}
+.pl-term span {display: block; color: var(--pl-mute); font-size: .88rem; margin-top: .1rem;}
+
+/* ---------- Upload screen ---------- */
+.pl-hero-title {font: 600 3rem 'Newsreader', Georgia, serif; line-height: 1.1; margin: 1.5rem 0 .4rem 0; color: var(--pl-ink);}
+.pl-hero-sub {font-size: 1.05rem; color: var(--pl-mute); max-width: 36rem; margin-bottom: 1.4rem;}
+[data-testid="stFileUploaderDropzone"] {
+    background: #fff; border: 2px dashed #9DB6CF; border-radius: 16px; padding: 2rem 1.2rem;
+}
+[data-testid="stFileUploaderDropzone"]:hover {border-color: var(--pl-accent); background: #F7FAFD;}
+.pl-feature {
+    background: #fff; border: 1px solid var(--pl-line); border-radius: 14px; padding: .9rem 1rem; height: 100%;
+}
+.pl-feature b {display: block; margin-bottom: .2rem; font-size: .95rem;}
+.pl-feature span {color: var(--pl-mute); font-size: .86rem; line-height: 1.45;}
+
+@media (prefers-reduced-motion: reduce) {* {transition: none !important;}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -172,8 +285,7 @@ def create_chunks(pages):
 
 
 def create_collection_name(file_bytes):
-    file_hash = hashlib.md5(file_bytes).hexdigest()
-    return f"research_paper_{file_hash[:10]}"
+    return f"research_paper_{hashlib.md5(file_bytes).hexdigest()[:10]}"
 
 
 def process_pdf(file_bytes):
@@ -209,10 +321,7 @@ def split_into_paragraphs(text):
     if len(blocks) < 3:
         flat = text.replace("\n", " ")
         sentences = re.split(r"(?<=[.!?])\s+", flat)
-        blocks = [
-            " ".join(sentences[i:i + 3])
-            for i in range(0, len(sentences), 3)
-        ]
+        blocks = [" ".join(sentences[i:i + 3]) for i in range(0, len(sentences), 3)]
 
     return [" ".join(b.split()) for b in blocks if b.strip()]
 
@@ -306,6 +415,13 @@ def go_to_page(page):
     st.session_state.viewer_page = page
 
 
+def step_page(delta, page_numbers):
+    current = st.session_state.get("viewer_page", page_numbers[0])
+    index = page_numbers.index(current) if current in page_numbers else 0
+    index = max(0, min(len(page_numbers) - 1, index + delta))
+    st.session_state.viewer_page = page_numbers[index]
+
+
 # ============================================================
 # AI FUNCTIONS
 # ============================================================
@@ -315,6 +431,11 @@ def paper_text_for_prompt(pages, limit=60000):
     return text[:limit]
 
 
+def parse_json(text):
+    cleaned = re.sub(r"^```(?:json)?|```$", "", text.strip()).strip()
+    return json.loads(cleaned)
+
+
 def generate_summary(pages):
     prompt = f"""
 You are a research paper analysis assistant.
@@ -322,27 +443,23 @@ You are a research paper analysis assistant.
 Analyze ONLY the research paper provided below.
 Do not use outside knowledge. Do not invent information.
 
-Write the answer in Markdown using EXACTLY these sections, each as a
-bold heading followed by 1 to 3 short sentences or bullets:
+Return a JSON object with exactly these string keys:
+"one_line" (one sentence that captures the whole paper),
+"objective", "problem", "method", "dataset", "technologies",
+"results", "limitations", "conclusion".
 
-**In one line**
-**Research objective**
-**Problem statement**
-**Methodology**
-**Dataset**
-**Algorithms and technologies used**
-**Main results**
-**Limitations**
-**Conclusion**
-
-If information is not available in the paper, write:
-Not specified in the paper.
+Each value is 1 to 3 short sentences. If information is not available in
+the paper, use: "Not specified in the paper."
 
 Research paper:
 {paper_text_for_prompt(pages)}
 """
-    response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-    return response.text
+    response = client.models.generate_content(
+        model=MODEL_NAME,
+        contents=prompt,
+        config=types.GenerateContentConfig(response_mime_type="application/json"),
+    )
+    return parse_json(response.text)
 
 
 def generate_glossary(pages):
@@ -361,9 +478,7 @@ Research paper:
         contents=prompt,
         config=types.GenerateContentConfig(response_mime_type="application/json"),
     )
-
-    text = re.sub(r"^```(?:json)?|```$", "", response.text.strip()).strip()
-    data = json.loads(text)
+    data = parse_json(response.text)
     return [
         {"term": str(d.get("term", "")), "meaning": str(d.get("meaning", ""))}
         for d in data
@@ -423,8 +538,7 @@ Retrieved paper content:
 # ============================================================
 
 def chat_button(chat_id, prefix):
-    chat = st.session_state.chats[chat_id]
-    title = chat["title"]
+    title = st.session_state.chats[chat_id]["title"]
     if len(title) > 30:
         title = title[:27] + "..."
 
@@ -435,35 +549,50 @@ def chat_button(chat_id, prefix):
         key=f"{prefix}_{chat_id}",
         use_container_width=True,
         type="primary" if is_current else "secondary",
+        icon=":material/description:",
     ):
         open_chat(chat_id)
         st.rerun()
 
 
 with st.sidebar:
-    st.markdown('<p class="pl-brand">PaperLens</p>', unsafe_allow_html=True)
-    st.markdown('<p class="pl-sub">Research paper assistant</p>', unsafe_allow_html=True)
+    st.markdown(
+        """
+<div class="pl-logo">
+    <div class="pl-logo-mark">P</div>
+    <div>
+        <div class="pl-logo-name">PaperLens</div>
+        <div class="pl-logo-sub">Research paper assistant</div>
+    </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
 
-    if st.button("New chat", use_container_width=True, icon=":material/add:"):
+    if st.button(
+        "New chat",
+        key="new_chat_btn",
+        use_container_width=True,
+        icon=":material/add:",
+    ):
         new_chat()
         st.rerun()
 
-    st.markdown('<p class="pl-label">Explanation level</p>', unsafe_allow_html=True)
-    st.radio(
+    st.markdown('<div class="pl-section">Explanation level</div>', unsafe_allow_html=True)
+    st.segmented_control(
         "Explanation level",
         LEVELS,
         key="explanation_mode",
-        horizontal=True,
         label_visibility="collapsed",
     )
 
     pinned_ids = [c for c in st.session_state.pinned if c in st.session_state.chats]
     if pinned_ids:
-        st.markdown('<p class="pl-label">Pinned</p>', unsafe_allow_html=True)
+        st.markdown('<div class="pl-section">Pinned</div>', unsafe_allow_html=True)
         for chat_id in pinned_ids:
             chat_button(chat_id, "pinned")
 
-    st.markdown('<p class="pl-label">Recents</p>', unsafe_allow_html=True)
+    st.markdown('<div class="pl-section">Recents</div>', unsafe_allow_html=True)
     recent_ids = [
         c
         for c in st.session_state.recents
@@ -477,7 +606,7 @@ with st.sidebar:
 
     current = get_current_chat()
     if current:
-        st.divider()
+        st.markdown('<div class="pl-section">This chat</div>', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
 
         with c1:
@@ -504,15 +633,14 @@ with st.sidebar:
 current_chat = get_current_chat()
 
 if current_chat is None:
-    _, center, _ = st.columns([1, 2, 1])
+    _, center, _ = st.columns([1, 3, 1])
 
     with center:
-        st.write("")
-        st.write("")
-        st.markdown("# PaperLens")
+        st.markdown('<div class="pl-hero-title">Read any paper<br>with a guide beside you.</div>', unsafe_allow_html=True)
         st.markdown(
-            "Upload a research paper, read it on the left, and get explanations "
-            "on the right, with page references for every answer."
+            '<div class="pl-hero-sub">Upload a research paper, read it on the left, '
+            "and get explanations on the right. Every answer points back to the page it came from.</div>",
+            unsafe_allow_html=True,
         )
 
         uploaded_file = st.file_uploader(
@@ -521,6 +649,19 @@ if current_chat is None:
             key=f"pdf_upload_{st.session_state.upload_key}",
             label_visibility="collapsed",
         )
+
+        st.write("")
+        f1, f2, f3 = st.columns(3)
+        features = [
+            ("Explain any paragraph", "Press Explain next to a passage and get it in plain words."),
+            ("Choose your level", "Switch between Simple, Student and Expert at any time."),
+            ("Answers with page numbers", "Jump straight to the source page behind each answer."),
+        ]
+        for col, (head, body) in zip((f1, f2, f3), features):
+            col.markdown(
+                f'<div class="pl-feature"><b>{head}</b><span>{body}</span></div>',
+                unsafe_allow_html=True,
+            )
 
         if uploaded_file:
             with st.spinner("Reading and indexing the paper..."):
@@ -541,7 +682,7 @@ else:
     pages = current_chat["pages"]
     collection = current_chat["collection"]
     history = current_chat["history"]
-    level = st.session_state.explanation_mode
+    level = st.session_state.explanation_mode or "Simple"
 
     # ---------------- Top bar ----------------
 
@@ -551,13 +692,16 @@ else:
         total_words = sum(len(p["text"].split()) for p in pages)
         st.markdown(f'<p class="pl-title">{html.escape(paper_name)}</p>', unsafe_allow_html=True)
         st.markdown(
-            f'<p class="pl-meta">{len(pages)} pages · {total_words:,} words · '
-            f"{level} explanations</p>",
+            f'<div class="pl-chips">'
+            f'<span class="pl-chip">{len(pages)} pages</span>'
+            f'<span class="pl-chip">{total_words:,} words</span>'
+            f'<span class="pl-chip accent">{level} explanations</span>'
+            f"</div>",
             unsafe_allow_html=True,
         )
 
     with button_col:
-        if st.button("New paper", use_container_width=True):
+        if st.button("New paper", use_container_width=True, icon=":material/upload_file:"):
             new_chat()
             st.rerun()
 
@@ -572,60 +716,86 @@ else:
         if st.session_state.get("viewer_page") not in page_numbers:
             st.session_state.viewer_page = page_numbers[0]
 
-        nav_col, hint_col = st.columns([1, 2])
+        with st.container(key="viewer_box", border=True):
+            prev_col, select_col, next_col = st.columns([1, 5, 1])
 
-        with nav_col:
-            st.selectbox(
-                "Page",
-                page_numbers,
-                key="viewer_page",
-                format_func=lambda p: f"Page {p} of {page_numbers[-1]}",
-                label_visibility="collapsed",
-            )
+            with prev_col:
+                st.button(
+                    "Prev",
+                    key="prev_page",
+                    on_click=step_page,
+                    args=(-1, page_numbers),
+                    use_container_width=True,
+                    icon=":material/chevron_left:",
+                )
 
-        with hint_col:
-            st.caption("Press Explain next to any paragraph to get it explained.")
+            with select_col:
+                st.selectbox(
+                    "Page",
+                    page_numbers,
+                    key="viewer_page",
+                    format_func=lambda p: f"Page {p} of {page_numbers[-1]}",
+                    label_visibility="collapsed",
+                )
 
-        page = st.session_state.viewer_page
+            with next_col:
+                st.button(
+                    "Next",
+                    key="next_page",
+                    on_click=step_page,
+                    args=(1, page_numbers),
+                    use_container_width=True,
+                    icon=":material/chevron_right:",
+                )
 
-        with st.container(height=600, border=True):
-            for idx, block in enumerate(split_into_paragraphs(page_lookup[page])):
-                text_col, action_col = st.columns([11, 2])
+            page = st.session_state.viewer_page
 
-                with text_col:
-                    safe = html.escape(block).replace("$", "&#36;")
-                    st.markdown(f'<div class="pl-para">{safe}</div>', unsafe_allow_html=True)
+            with st.container(height=560, border=False):
+                st.markdown(
+                    '<div class="pl-page-tag">Hover a paragraph, then press Explain to get it explained.</div>',
+                    unsafe_allow_html=True,
+                )
 
-                with action_col:
-                    st.button(
-                        "Explain",
-                        key=f"explain_{page}_{idx}",
-                        on_click=explain_passage,
-                        args=(block, page),
-                        use_container_width=True,
-                    )
+                for idx, block in enumerate(split_into_paragraphs(page_lookup[page])):
+                    text_col, action_col = st.columns([11, 2])
+
+                    with text_col:
+                        safe = html.escape(block).replace("$", "&#36;")
+                        st.markdown(f'<div class="pl-para">{safe}</div>', unsafe_allow_html=True)
+
+                    with action_col:
+                        st.button(
+                            "Explain",
+                            key=f"explain_{page}_{idx}",
+                            on_click=explain_passage,
+                            args=(block, page),
+                            use_container_width=True,
+                            icon=":material/lightbulb:",
+                        )
 
     # ---------------- Right: assistant panel ----------------
 
     with assistant_col:
-        st.radio(
+        st.segmented_control(
             "Panel",
             ["Chat", "Overview", "Glossary"],
             key="panel",
-            horizontal=True,
             label_visibility="collapsed",
         )
 
-        panel = st.session_state.panel
+        panel = st.session_state.panel or "Chat"
 
         # ----- Chat -----
         if panel == "Chat":
             pending = st.session_state.pending
 
-            with st.container(height=520, border=True):
+            with st.container(key="assist_box", height=520, border=True):
                 if not history and not pending:
-                    st.markdown("**Ask anything about this paper**")
-                    st.caption("Or start with one of these:")
+                    st.markdown(
+                        '<div class="pl-empty"><b>Ask anything about this paper</b>'
+                        "<span>Or start with one of these</span></div>",
+                        unsafe_allow_html=True,
+                    )
                     for i, suggestion in enumerate(
                         [
                             "What problem does this paper solve?",
@@ -642,16 +812,17 @@ else:
                         )
 
                 for m_idx, item in enumerate(history):
-                    with st.chat_message("user"):
+                    with st.chat_message("user", avatar=":material/person:"):
                         if item.get("passage"):
+                            passage = item["passage"]
                             st.markdown(
-                                f'<div class="pl-quote">{html.escape(item["passage"][:300])}'
-                                f'{"..." if len(item["passage"]) > 300 else ""}</div>',
+                                f'<div class="pl-quote">{html.escape(passage[:300])}'
+                                f'{"..." if len(passage) > 300 else ""}</div>',
                                 unsafe_allow_html=True,
                             )
                         st.write(item["question"])
 
-                    with st.chat_message("assistant"):
+                    with st.chat_message("assistant", avatar=":material/auto_stories:"):
                         st.write(item["answer"])
 
                         metadata = item.get("metadata", [])
@@ -663,7 +834,7 @@ else:
                             cols = st.columns(len(cited))
                             for c, p in zip(cols, cited):
                                 c.button(
-                                    f"p. {p}",
+                                    f"Page {p}",
                                     key=f"go_{m_idx}_{p}",
                                     on_click=go_to_page,
                                     args=(p,),
@@ -680,7 +851,7 @@ else:
                                     st.caption(chunk)
 
                 if pending:
-                    with st.chat_message("user"):
+                    with st.chat_message("user", avatar=":material/person:"):
                         if pending.get("passage"):
                             st.markdown(
                                 f'<div class="pl-quote">{html.escape(pending["passage"][:300])}</div>',
@@ -688,7 +859,7 @@ else:
                             )
                         st.write(pending["question"])
 
-                    with st.chat_message("assistant"):
+                    with st.chat_message("assistant", avatar=":material/auto_stories:"):
                         with st.spinner("Reading the paper..."):
                             try:
                                 answer, chunks, metadata, distances = ask_question(
@@ -733,19 +904,35 @@ else:
 
         # ----- Overview -----
         elif panel == "Overview":
-            with st.container(height=580, border=True):
-                if current_chat["summary"]:
-                    st.markdown(current_chat["summary"])
-                    if st.button("Regenerate overview"):
+            with st.container(key="assist_box", height=580, border=True):
+                summary = current_chat["summary"]
+
+                if summary:
+                    if summary.get("one_line"):
+                        st.markdown(
+                            f'<div class="pl-oneline">{html.escape(str(summary["one_line"]))}</div>',
+                            unsafe_allow_html=True,
+                        )
+
+                    for field, label in SUMMARY_FIELDS:
+                        value = summary.get(field)
+                        if value:
+                            st.markdown(
+                                f'<div class="pl-field"><div class="pl-field-label">{label}</div>'
+                                f'<div class="pl-field-text">{html.escape(str(value))}</div></div>',
+                                unsafe_allow_html=True,
+                            )
+
+                    if st.button("Regenerate overview", icon=":material/refresh:"):
                         current_chat["summary"] = None
                         st.rerun()
                 else:
-                    st.markdown("**Paper at a glance**")
-                    st.caption(
-                        "A structured summary: objective, method, dataset, "
-                        "results and limitations."
+                    st.markdown(
+                        '<div class="pl-empty"><b>Paper at a glance</b>'
+                        "<span>Objective, method, dataset, results and limitations in one view.</span></div>",
+                        unsafe_allow_html=True,
                     )
-                    if st.button("Generate overview", type="primary"):
+                    if st.button("Generate overview", type="primary", use_container_width=True):
                         with st.spinner("Generating overview..."):
                             try:
                                 current_chat["summary"] = generate_summary(pages)
@@ -755,18 +942,28 @@ else:
 
         # ----- Glossary -----
         else:
-            with st.container(height=580, border=True):
-                if current_chat["glossary"]:
-                    for entry in current_chat["glossary"]:
-                        st.markdown(f"**{entry['term']}**")
-                        st.caption(entry["meaning"])
-                    if st.button("Regenerate glossary"):
+            with st.container(key="assist_box", height=580, border=True):
+                glossary = current_chat["glossary"]
+
+                if glossary:
+                    for entry in glossary:
+                        st.markdown(
+                            f'<div class="pl-term"><b>{html.escape(entry["term"])}</b>'
+                            f'<span>{html.escape(entry["meaning"])}</span></div>',
+                            unsafe_allow_html=True,
+                        )
+
+                    st.write("")
+                    if st.button("Regenerate glossary", icon=":material/refresh:"):
                         current_chat["glossary"] = None
                         st.rerun()
                 else:
-                    st.markdown("**Key terms**")
-                    st.caption("Important terms from this paper in plain language.")
-                    if st.button("Generate glossary", type="primary"):
+                    st.markdown(
+                        '<div class="pl-empty"><b>Key terms</b>'
+                        "<span>Important terms from this paper, in plain language.</span></div>",
+                        unsafe_allow_html=True,
+                    )
+                    if st.button("Generate glossary", type="primary", use_container_width=True):
                         with st.spinner("Collecting key terms..."):
                             try:
                                 current_chat["glossary"] = generate_glossary(pages)
