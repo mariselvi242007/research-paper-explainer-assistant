@@ -106,54 +106,154 @@ if "history" not in st.session_state:
 # =========================================================
 # SIDEBAR
 # =========================================================
+# =========================================================
+# PROFESSIONAL COMPACT SIDEBAR
+# =========================================================
 
 with st.sidebar:
 
     st.title("📚 PaperLens")
 
+    st.caption("Research Paper Assistant")
+
+    st.divider()
+
+    # -----------------------------------------------------
+    # CURRENT DOCUMENT
+    # -----------------------------------------------------
+
+    st.subheader("Current Document")
+
+    if st.session_state.paper_name:
+
+        st.write(
+            f"📄 {st.session_state.paper_name}"
+        )
+
+        st.caption(
+            f"{len(st.session_state.pages)} pages"
+        )
+
+    else:
+
+        st.caption(
+            "No paper uploaded yet."
+        )
+
+
+    st.divider()
+
+
+    # -----------------------------------------------------
+    # EXPLANATION PREFERENCE
+    # -----------------------------------------------------
+
+    st.subheader("Explanation Level")
+
+    sidebar_mode = st.radio(
+        "Choose how answers should be explained",
+        ["Simple", "Technical"],
+        index=0,
+        label_visibility="collapsed"
+    )
+
+
+    st.divider()
+
+
+    # -----------------------------------------------------
+    # QUICK ACTIONS
+    # -----------------------------------------------------
+
+    st.subheader("Quick Actions")
+
+    if st.session_state.collection is not None:
+
+        if st.button(
+            "📝 Generate Summary",
+            use_container_width=True
+        ):
+
+            with st.spinner(
+                "Generating summary..."
+            ):
+
+                try:
+
+                    st.session_state.summary = (
+                        generate_summary(
+                            st.session_state.pages
+                        )
+                    )
+
+                    st.success(
+                        "Summary generated."
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Unable to generate summary: {e}"
+                    )
+
+    else:
+
+        st.button(
+            "📝 Generate Summary",
+            disabled=True,
+            use_container_width=True
+        )
+
+
+    if st.button(
+        "🗑️ Clear Session",
+        use_container_width=True
+    ):
+
+        st.session_state.collection = None
+        st.session_state.paper_name = None
+        st.session_state.pages = []
+        st.session_state.summary = None
+        st.session_state.history = []
+
+        st.rerun()
+
+
+    st.divider()
+
+
+    # -----------------------------------------------------
+    # HOW TO USE
+    # -----------------------------------------------------
+
+    st.subheader("How to Use")
+
     st.caption(
-        "Research Paper Assistant"
+        "1. Upload a PDF"
     )
 
-    st.divider()
-
-    st.subheader("Workspace")
-
-    st.write("📄 Research Paper")
-    st.write("📝 Summary")
-    st.write("💬 Ask Questions")
-    st.write("📚 Sources")
-
-    st.divider()
-
-    st.subheader("Quick Start")
-
-    st.write(
-        "1. Upload a research paper"
-    )
-
-    st.write(
+    st.caption(
         "2. Generate a summary"
     )
 
-    st.write(
+    st.caption(
         "3. Ask questions"
     )
 
-    st.write(
-        "4. Review source evidence"
+    st.caption(
+        "4. Check the sources"
     )
+
+
+    # -----------------------------------------------------
+    # FOOTER
+    # -----------------------------------------------------
 
     st.divider()
 
-    st.subheader("About")
-
     st.caption(
-        "PaperLens helps students and researchers "
-        "understand academic papers through summaries "
-        "and document-based question answering."
+        "PaperLens • Academic AI Assistant"
     )
-
 
 # =========================================================
 # PDF UPLOAD
