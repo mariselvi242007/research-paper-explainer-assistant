@@ -502,35 +502,108 @@ User Question:
 # =========================================================
 # SIDEBAR
 # =========================================================
+# =========================================================
+# PROFESSIONAL SIDEBAR
+# =========================================================
 
 with st.sidebar:
 
-    st.header("⚙️ Assistant")
+    st.markdown(
+        """
+        <div style="
+            text-align:center;
+            padding:10px 0 20px 0;
+        ">
+            <div style="
+                font-size:42px;
+                margin-bottom:8px;
+            ">
+                📚
+            </div>
 
-    st.write(
-        "Upload a research paper and use the "
-        "assistant to understand it."
+            <div style="
+                font-size:21px;
+                font-weight:700;
+            ">
+                PaperLens
+            </div>
+
+            <div style="
+                font-size:13px;
+                color:#777;
+                margin-top:4px;
+            ">
+                Research Paper Assistant
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
     st.divider()
 
-    st.subheader("Features")
+    st.markdown(
+        """
+        <div style="
+            font-size:14px;
+            font-weight:600;
+            margin-bottom:12px;
+        ">
+            WORKSPACE
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    st.write("📄 PDF Upload")
-    st.write("📝 Automatic Summary")
-    st.write("🔎 Question Answering")
-    st.write("🧠 Simple / Technical Mode")
-    st.write("📚 Page-Based Sources")
-    st.write("🔗 RAG-based Retrieval")
+    st.write("📄  Research Paper")
+    st.write("📝  Summary")
+    st.write("💬  Ask Questions")
+    st.write("📚  Sources")
 
     st.divider()
 
-    st.caption(
-        "Embeddings, vector database and retrieval "
-        "work in the backend."
+    st.markdown(
+        """
+        <div style="
+            font-size:14px;
+            font-weight:600;
+            margin-bottom:10px;
+        ">
+            QUICK START
+        </div>
+
+        <div style="
+            font-size:13px;
+            line-height:1.7;
+            color:#666;
+        ">
+            <b>1.</b> Upload a research paper<br>
+            <b>2.</b> Generate its summary<br>
+            <b>3.</b> Ask questions<br>
+            <b>4.</b> Explore the sources
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
+    st.divider()
 
+    st.markdown(
+        """
+        <div style="
+            padding:12px;
+            border-radius:8px;
+            background-color:#f7f7f7;
+            text-align:center;
+            font-size:12px;
+            color:#666;
+        ">
+            <b>Research Paper Explainer</b><br>
+            AI-powered academic assistant
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 # =========================================================
 # PDF UPLOAD
 # =========================================================
