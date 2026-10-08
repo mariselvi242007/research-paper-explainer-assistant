@@ -1,5 +1,6 @@
 import html
 import uuid
+from datetime import datetime, timedelta, timezone
 import hashlib
 from io import BytesIO
 
@@ -27,6 +28,9 @@ PRIMARY_MODEL = "gemini-3-flash-preview"
 # If the main model hits its daily free quota, the next one is tried automatically.
 # (Gemini free-tier quotas are counted separately for each model.)
 FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+
+# Time zone used when telling the user when the limit resets (India Standard Time).
+DISPLAY_TZ = timezone(timedelta(hours=5, minutes=30), "IST")
 MODES = ["Simple", "Technical"]
 
 
@@ -348,10 +352,27 @@ def ask_summary():
 class QuotaExceeded(Exception):
     """Raised when no model could answer because of quota limits or availability."""
 
-    def __init__(self, quota_models, unavailable_models):
+    def __init__(self, quota_models, unavailable_models, retry_seconds=None):
         super().__init__("Gemini quota exceeded")
         self.quota_models = quota_models
         self.unavailable_models = unavailable_models
+        self.retry_seconds = retry_seconds
+
+
+def parse_retry_seconds(message):
+    """Read how long Google says to wait from a 429 error message."""
+    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s", message)
+    if match:
+        return float(match.group(1))
+
+    match = re.search(
+        r"retry in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+(?:\.\d+)?)s)?", message
+    )
+    if match and any(match.groups()):
+        hours, minutes, seconds = match.groups()
+        return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds or 0)
+
+    return None
 
 
 def get_model_candidates():
@@ -368,6 +389,7 @@ def generate_text(prompt):
     """Call Gemini, moving to the next model if one is out of quota or unavailable."""
     quota_models = []
     unavailable_models = []
+    retry_delays = []
 
     for model in get_model_candidates():
         try:
@@ -378,6 +400,9 @@ def generate_text(prompt):
 
             if "429" in message or "RESOURCE_EXHAUSTED" in message:
                 quota_models.append(model)
+                delay = parse_retry_seconds(message)
+                if delay is not None:
+                    retry_delays.append(delay)
                 continue
 
             if any(code in message for code in ("404", "NOT_FOUND", "503", "UNAVAILABLE")):
@@ -386,39 +411,55 @@ def generate_text(prompt):
 
             raise
 
-    raise QuotaExceeded(quota_models, unavailable_models)
+    raise QuotaExceeded(
+        quota_models,
+        unavailable_models,
+        min(retry_delays) if retry_delays else None,
+    )
+
+
+def format_wait(seconds):
+    seconds = int(round(seconds))
+    hours, remainder = divmod(seconds, 3600)
+    minutes = remainder // 60
+
+    parts = []
+    if hours:
+        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+    if minutes:
+        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+    if not parts:
+        parts.append(f"{max(seconds, 1)} seconds")
+
+    return " ".join(parts)
 
 
 def friendly_error(error):
     if isinstance(error, QuotaExceeded):
-        if error.quota_models:
-            lines = [
-                "**The daily Gemini limit has been reached.**",
-                "",
-                "The free plan allows only a small number of requests per day. "
-                "The quota is used up for: " + ", ".join(error.quota_models) + ".",
-            ]
-            if error.unavailable_models:
-                lines.append(
-                    "These models could not be used at all: "
-                    + ", ".join(error.unavailable_models) + "."
-                )
-            lines += [
-                "",
-                "The quota resets every day at midnight Pacific time. To keep going now, you can:",
-                "- use an API key from a different Google AI Studio project, or",
-                "- turn on billing for your current project.",
-            ]
-        else:
-            lines = [
-                "**No Gemini model could be reached.**",
-                "",
-                "These models were unavailable: " + ", ".join(error.unavailable_models) + ".",
-                "",
-                "Please try again in a moment. If it keeps happening, set a model that your "
-                "account supports with GEMINI_MODEL in Streamlit Secrets.",
-            ]
-        return "\n".join(lines)
+        seconds = error.retry_seconds
+
+        if seconds is None:
+            return (
+                "You have reached your daily limit. "
+                "You can use PaperLens again after midnight Pacific time."
+            )
+
+        if seconds < 3600:
+            return (
+                "You have reached the request limit. "
+                f"Please try again in about {format_wait(seconds)}."
+            )
+
+        reset = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+        local = reset.astimezone(DISPLAY_TZ)
+        clock = local.strftime("%I:%M %p").lstrip("0")
+        day = f"{local.day} {local.strftime('%b')}"
+
+        return (
+            "You have reached your daily limit. "
+            f"You can use PaperLens again after {clock} {DISPLAY_TZ.tzname(None)} on {day} "
+            f"(in about {format_wait(seconds)})."
+        )
 
     text = str(error)
     if len(text) > 300:
