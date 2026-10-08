@@ -346,7 +346,12 @@ def ask_summary():
 # ============================================================
 
 class QuotaExceeded(Exception):
-    """Raised when every configured Gemini model has hit its quota."""
+    """Raised when no model could answer because of quota limits or availability."""
+
+    def __init__(self, quota_models, unavailable_models):
+        super().__init__("Gemini quota exceeded")
+        self.quota_models = quota_models
+        self.unavailable_models = unavailable_models
 
 
 def get_model_candidates():
@@ -361,8 +366,8 @@ def get_model_candidates():
 
 def generate_text(prompt):
     """Call Gemini, moving to the next model if one is out of quota or unavailable."""
-    quota_hit = False
-    last_error = None
+    quota_models = []
+    unavailable_models = []
 
     for model in get_model_candidates():
         try:
@@ -370,30 +375,50 @@ def generate_text(prompt):
             return response.text or "The model returned an empty answer. Please try again."
         except Exception as e:
             message = str(e)
-            last_error = e
 
             if "429" in message or "RESOURCE_EXHAUSTED" in message:
-                quota_hit = True
+                quota_models.append(model)
                 continue
 
             if any(code in message for code in ("404", "NOT_FOUND", "503", "UNAVAILABLE")):
+                unavailable_models.append(model)
                 continue
 
             raise
 
-    if quota_hit:
-        raise QuotaExceeded()
-
-    raise last_error
+    raise QuotaExceeded(quota_models, unavailable_models)
 
 
 def friendly_error(error):
     if isinstance(error, QuotaExceeded):
-        return (
-            "The Gemini API quota for today is used up on every model. "
-            "It resets at midnight Pacific time. To continue now, add billing to your "
-            "Google AI Studio project or use an API key from a different project."
-        )
+        if error.quota_models:
+            lines = [
+                "**The daily Gemini limit has been reached.**",
+                "",
+                "The free plan allows only a small number of requests per day. "
+                "The quota is used up for: " + ", ".join(error.quota_models) + ".",
+            ]
+            if error.unavailable_models:
+                lines.append(
+                    "These models could not be used at all: "
+                    + ", ".join(error.unavailable_models) + "."
+                )
+            lines += [
+                "",
+                "The quota resets every day at midnight Pacific time. To keep going now, you can:",
+                "- use an API key from a different Google AI Studio project, or",
+                "- turn on billing for your current project.",
+            ]
+        else:
+            lines = [
+                "**No Gemini model could be reached.**",
+                "",
+                "These models were unavailable: " + ", ".join(error.unavailable_models) + ".",
+                "",
+                "Please try again in a moment. If it keeps happening, set a model that your "
+                "account supports with GEMINI_MODEL in Streamlit Secrets.",
+            ]
+        return "\n".join(lines)
 
     text = str(error)
     if len(text) > 300:
