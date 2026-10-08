@@ -64,8 +64,12 @@ st.markdown(
 .stApp {font-family: 'Public Sans', system-ui, sans-serif;}
 footer, #MainMenu {display: none;}
 header[data-testid="stHeader"] {background: transparent;}
-[data-testid="stToolbar"], [data-testid="stAppDeployButton"], [data-testid="stDecoration"],
-[data-testid="stStatusWidget"] {display: none !important;}
+/* Hide only the right-hand toolbar items (share, star, edit, GitHub, menu).
+   The left side holds the button that reopens the sidebar, so it must stay visible. */
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"], [data-testid="stAppDeployButton"],
+[data-testid="stDecoration"], [data-testid="stStatusWidget"] {display: none !important;}
+[data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"] {display: flex !important; visibility: visible !important;}
 
 /* Centered reading column for the chat */
 .block-container {max-width: 880px; padding-top: 2rem; padding-bottom: 6rem;}
