@@ -8,21 +8,425 @@ from google import genai
 import hashlib
 
 
-# =========================================================
-# PAGE CONFIGURATION
-# =========================================================
+# ============================================================
+# PAGE CONFIG
+# ============================================================
 
 st.set_page_config(
     page_title="PaperLens",
-    page_icon="📚",
+    page_icon="P",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
 
-# =========================================================
+# ============================================================
+# CHATGPT-STYLE UI
+# ============================================================
+
+st.markdown(
+    """
+    <style>
+
+    /* --------------------------------------------------------
+       GLOBAL
+    -------------------------------------------------------- */
+
+    #MainMenu {
+        visibility: hidden;
+    }
+
+    footer {
+        visibility: hidden;
+    }
+
+    header {
+        background: transparent !important;
+    }
+
+    html, body, [class*="css"] {
+        font-family:
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            Helvetica,
+            Arial,
+            sans-serif;
+    }
+
+    .stApp {
+        background: #212121;
+    }
+
+    /* --------------------------------------------------------
+       SIDEBAR
+    -------------------------------------------------------- */
+
+    section[data-testid="stSidebar"] {
+        background: #171717;
+        border-right: 1px solid #2f2f2f;
+    }
+
+    section[data-testid="stSidebar"] > div {
+        padding-top: 14px;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    section[data-testid="stSidebar"] * {
+        color: #ececec;
+    }
+
+    /* --------------------------------------------------------
+       PAPERLENS LOGO
+       -------------------------------------------------------- */
+
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px 18px 8px;
+    }
+
+    .brand-logo {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        background: #2f2f2f;
+        border: 1px solid #444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 17px;
+        font-weight: 700;
+        color: #ffffff;
+    }
+
+    .brand-name {
+        font-size: 17px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: -0.2px;
+    }
+
+    /* --------------------------------------------------------
+       SIDEBAR BUTTONS
+       -------------------------------------------------------- */
+
+    section[data-testid="stSidebar"] .stButton > button {
+        width: 100%;
+        min-height: 40px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: transparent;
+        color: #ececec;
+        text-align: left;
+        font-size: 14px;
+        font-weight: 400;
+        padding: 8px 10px;
+        transition: background 0.15s ease;
+    }
+
+    section[data-testid="stSidebar"] .stButton > button:hover {
+        background: #2a2a2a;
+        border-color: transparent;
+    }
+
+    /* New paper button */
+
+    .new-paper-label {
+        margin-top: 2px;
+        margin-bottom: 10px;
+    }
+
+    /* --------------------------------------------------------
+       SIDEBAR SECTION LABELS
+       -------------------------------------------------------- */
+
+    .side-label {
+        color: #9b9b9b;
+        font-size: 12px;
+        font-weight: 500;
+        padding: 15px 9px 6px 9px;
+    }
+
+    .current-paper {
+        background: #252525;
+        border-radius: 8px;
+        padding: 9px 10px;
+        margin: 4px 0;
+    }
+
+    .current-paper-title {
+        font-size: 13px;
+        color: #eeeeee;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .current-paper-pages {
+        font-size: 11px;
+        color: #8e8e8e;
+        margin-top: 3px;
+    }
+
+    /* --------------------------------------------------------
+       RADIO
+       -------------------------------------------------------- */
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 3px;
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        border-radius: 7px;
+        padding: 5px 8px;
+    }
+
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        background: #2a2a2a;
+    }
+
+    /* --------------------------------------------------------
+       MAIN AREA
+       -------------------------------------------------------- */
+
+    .main .block-container {
+        max-width: 900px;
+        padding-top: 30px;
+        padding-bottom: 120px;
+    }
+
+    /* --------------------------------------------------------
+       WELCOME SCREEN
+       -------------------------------------------------------- */
+
+    .welcome {
+        text-align: center;
+        padding-top: 15vh;
+        padding-bottom: 30px;
+    }
+
+    .welcome-logo {
+        width: 48px;
+        height: 48px;
+        margin: auto;
+        border-radius: 12px;
+        background: #2f2f2f;
+        border: 1px solid #444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 23px;
+        font-weight: 700;
+    }
+
+    .welcome-title {
+        margin-top: 18px;
+        font-size: 30px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: -0.7px;
+    }
+
+    .welcome-subtitle {
+        margin-top: 8px;
+        font-size: 15px;
+        color: #a5a5a5;
+    }
+
+    /* --------------------------------------------------------
+       PAPER HEADER
+       -------------------------------------------------------- */
+
+    .paper-header {
+        padding: 10px 0 20px 0;
+    }
+
+    .paper-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #ffffff;
+        letter-spacing: -0.4px;
+    }
+
+    .paper-meta {
+        margin-top: 5px;
+        font-size: 13px;
+        color: #8e8e8e;
+    }
+
+    /* --------------------------------------------------------
+       CHAT MESSAGES
+       -------------------------------------------------------- */
+
+    .user-message {
+        display: flex;
+        justify-content: flex-end;
+        margin: 24px 0 18px 0;
+    }
+
+    .user-bubble {
+        max-width: 75%;
+        background: #2f2f2f;
+        color: #ececec;
+        padding: 11px 15px;
+        border-radius: 18px;
+        font-size: 15px;
+        line-height: 1.55;
+    }
+
+    .assistant-message {
+        margin: 20px 0 30px 0;
+    }
+
+    .assistant-header {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        margin-bottom: 9px;
+    }
+
+    .assistant-logo {
+        width: 27px;
+        height: 27px;
+        border-radius: 7px;
+        background: #303030;
+        border: 1px solid #454545;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .assistant-name {
+        color: #eeeeee;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .assistant-content {
+        color: #e6e6e6;
+        font-size: 15px;
+        line-height: 1.7;
+    }
+
+    /* --------------------------------------------------------
+       SOURCE BOX
+       -------------------------------------------------------- */
+
+    .source-title {
+        color: #a0a0a0;
+        font-size: 12px;
+        font-weight: 500;
+        margin-top: 15px;
+        margin-bottom: 5px;
+    }
+
+    /* --------------------------------------------------------
+       UPLOADER
+       -------------------------------------------------------- */
+
+    div[data-testid="stFileUploader"] {
+        margin-top: 10px;
+    }
+
+    div[data-testid="stFileUploader"] section {
+        background: #2a2a2a;
+        border: 1px dashed #555;
+        border-radius: 12px;
+    }
+
+    div[data-testid="stFileUploader"] section:hover {
+        border-color: #777;
+    }
+
+    /* --------------------------------------------------------
+       TEXT INPUT
+       -------------------------------------------------------- */
+
+    div[data-testid="stTextInput"] input {
+        background: #2f2f2f;
+        color: #ffffff;
+        border: 1px solid #454545;
+        border-radius: 12px;
+        padding: 12px 15px;
+        font-size: 15px;
+    }
+
+    div[data-testid="stTextInput"] input:focus {
+        border-color: #666;
+        box-shadow: none;
+    }
+
+    /* --------------------------------------------------------
+       PRIMARY BUTTON
+       -------------------------------------------------------- */
+
+    .stButton > button[kind="primary"] {
+        border-radius: 9px;
+        background: #ffffff;
+        color: #171717;
+        border: none;
+        font-weight: 600;
+    }
+
+    .stButton > button[kind="primary"]:hover {
+        background: #dddddd;
+        color: #111111;
+    }
+
+    /* --------------------------------------------------------
+       EXPANDERS
+       -------------------------------------------------------- */
+
+    div[data-testid="stExpander"] {
+        background: #252525;
+        border: 1px solid #353535;
+        border-radius: 9px;
+        margin-top: 7px;
+    }
+
+    /* --------------------------------------------------------
+       DIVIDERS
+       -------------------------------------------------------- */
+
+    hr {
+        border-color: #343434 !important;
+    }
+
+    /* --------------------------------------------------------
+       METRICS
+       -------------------------------------------------------- */
+
+    div[data-testid="stMetric"] {
+        background: #252525;
+        padding: 12px;
+        border-radius: 9px;
+        border: 1px solid #353535;
+    }
+
+    /* --------------------------------------------------------
+       ALERTS
+       -------------------------------------------------------- */
+
+    div[data-testid="stAlert"] {
+        border-radius: 9px;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+
+# ============================================================
 # SESSION STATE
-# =========================================================
+# ============================================================
 
 if "collection" not in st.session_state:
     st.session_state.collection = None
@@ -46,28 +450,38 @@ if "explanation_mode" not in st.session_state:
     st.session_state.explanation_mode = "Simple"
 
 
-# =========================================================
-# GEMINI CLIENT
-# =========================================================
+# ============================================================
+# GEMINI
+# ============================================================
 
 try:
+
     api_key = st.secrets["GEMINI_API_KEY"]
-    client = genai.Client(api_key=api_key)
+
+    client = genai.Client(
+        api_key=api_key
+    )
+
 except Exception:
+
     client = None
 
 
-# =========================================================
+# ============================================================
 # MODELS
-# =========================================================
+# ============================================================
 
 @st.cache_resource
 def load_embedding_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
+
+    return SentenceTransformer(
+        "all-MiniLM-L6-v2"
+    )
 
 
 @st.cache_resource
 def load_chroma_client():
+
     return chromadb.Client()
 
 
@@ -75,40 +489,53 @@ embedding_model = load_embedding_model()
 chroma_client = load_chroma_client()
 
 
-# =========================================================
-# PDF TEXT EXTRACTION
-# =========================================================
+# ============================================================
+# PDF EXTRACTION
+# ============================================================
 
 def extract_pdf_pages(file_bytes):
 
     pages = []
 
-    # Convert bytes into a file-like object
+    # IMPORTANT:
+    # Convert bytes to file-like object.
+    # This fixes:
+    # "'bytes' object has no attribute 'seek'"
+
     pdf_file = BytesIO(file_bytes)
 
     reader = PdfReader(pdf_file)
 
-    for page_number, page in enumerate(reader.pages, start=1):
+    for page_number, page in enumerate(
+        reader.pages,
+        start=1
+    ):
 
         page_text = page.extract_text()
 
         if page_text:
+
             page_text = page_text.strip()
+
         else:
+
             page_text = ""
 
         if page_text:
-            pages.append({
-                "page": page_number,
-                "text": page_text
-            })
+
+            pages.append(
+                {
+                    "page": page_number,
+                    "text": page_text
+                }
+            )
 
     return pages
 
 
-# =========================================================
-# CREATE CHUNKS
-# =========================================================
+# ============================================================
+# CHUNKING
+# ============================================================
 
 def create_chunks(pages):
 
@@ -125,43 +552,58 @@ def create_chunks(pages):
         page_number = page_data["page"]
         page_text = page_data["text"]
 
-        page_chunks = text_splitter.split_text(page_text)
+        page_chunks = text_splitter.split_text(
+            page_text
+        )
 
         for chunk in page_chunks:
 
             chunks.append(chunk)
-            page_numbers.append(page_number)
+
+            page_numbers.append(
+                page_number
+            )
 
     return chunks, page_numbers
 
 
-# =========================================================
+# ============================================================
 # COLLECTION NAME
-# =========================================================
+# ============================================================
 
 def create_collection_name(file_bytes):
 
-    file_hash = hashlib.md5(file_bytes).hexdigest()
+    file_hash = hashlib.md5(
+        file_bytes
+    ).hexdigest()
 
-    return f"research_paper_{file_hash[:10]}"
+    return (
+        f"research_paper_{file_hash[:10]}"
+    )
 
 
-# =========================================================
-# PROCESS PDF
-# =========================================================
+# ============================================================
+# PROCESS PAPER
+# ============================================================
 
 def process_pdf(file_bytes):
 
-    pages = extract_pdf_pages(file_bytes)
+    pages = extract_pdf_pages(
+        file_bytes
+    )
 
     if not pages:
+
         raise ValueError(
             "No readable text was found in this PDF."
         )
 
-    chunks, page_numbers = create_chunks(pages)
+    chunks, page_numbers = create_chunks(
+        pages
+    )
 
     if not chunks:
+
         raise ValueError(
             "No text chunks were created."
         )
@@ -171,13 +613,14 @@ def process_pdf(file_bytes):
         show_progress_bar=False
     )
 
-    collection_name = create_collection_name(file_bytes)
+    collection_name = create_collection_name(
+        file_bytes
+    )
 
     collection = chroma_client.get_or_create_collection(
         name=collection_name
     )
 
-    # Add only if collection is empty
     if collection.count() == 0:
 
         chunk_ids = [
@@ -202,18 +645,18 @@ def process_pdf(file_bytes):
     return pages, collection
 
 
-# =========================================================
-# SUMMARY GENERATION
-# =========================================================
+# ============================================================
+# SUMMARY
+# ============================================================
 
 def generate_summary(pages):
 
     if client is None:
+
         raise ValueError(
             "Gemini API key is not configured."
         )
 
-    # Limit extremely large papers
     full_text = "\n\n".join(
         [
             f"[Page {p['page']}]\n{p['text']}"
@@ -228,10 +671,14 @@ Analyze ONLY the research paper provided below.
 
 Do not use outside knowledge.
 Do not invent information.
-If something is not clearly available in the paper,
-write "Not specified in the paper."
 
-Create a clear academic summary using exactly these sections:
+If something is not available in the paper,
+write:
+
+"Not specified in the paper."
+
+Create a clear academic summary using exactly
+these sections:
 
 1. Research Objective
 2. Problem Statement
@@ -242,9 +689,11 @@ Create a clear academic summary using exactly these sections:
 7. Limitations
 8. Conclusion
 
-Keep the explanation clear and suitable for a college student.
+Keep the explanation clear and suitable
+for a college student.
 
 Research Paper:
+
 {full_text}
 """
 
@@ -256,9 +705,9 @@ Research Paper:
     return response.text
 
 
-# =========================================================
-# QUESTION ANSWERING / RAG
-# =========================================================
+# ============================================================
+# RAG QUESTION ANSWERING
+# ============================================================
 
 def ask_question(
     question,
@@ -267,16 +716,23 @@ def ask_question(
 ):
 
     if client is None:
+
         raise ValueError(
             "Gemini API key is not configured."
         )
 
-    # Create question embedding
+    # --------------------------------------------------------
+    # Question embedding
+    # --------------------------------------------------------
+
     question_embedding = embedding_model.encode(
         [question]
     )[0]
 
+    # --------------------------------------------------------
     # Retrieve relevant chunks
+    # --------------------------------------------------------
+
     results = collection.query(
         query_embeddings=[
             question_embedding.tolist()
@@ -285,18 +741,31 @@ def ask_question(
     )
 
     retrieved_chunks = results["documents"][0]
+
     retrieved_metadata = results["metadatas"][0]
+
     retrieved_ids = results["ids"][0]
 
     if "distances" in results:
-        distances = results["distances"][0]
-    else:
-        distances = [0] * len(retrieved_chunks)
 
-    # Combine retrieved context
+        distances = results["distances"][0]
+
+    else:
+
+        distances = [
+            0
+            for _ in retrieved_chunks
+        ]
+
+    # --------------------------------------------------------
+    # Build context
+    # --------------------------------------------------------
+
     context = ""
 
-    for i, chunk in enumerate(retrieved_chunks):
+    for i, chunk in enumerate(
+        retrieved_chunks
+    ):
 
         page = retrieved_metadata[i].get(
             "page",
@@ -308,46 +777,69 @@ def ask_question(
             f"{chunk}"
         )
 
+    # --------------------------------------------------------
+    # Explanation mode
+    # --------------------------------------------------------
+
     if explanation_mode == "Simple":
 
         instruction = """
 Explain the answer in simple language.
+
 Assume the user is a beginner.
+
 Avoid unnecessary technical jargon.
-Use short paragraphs or bullet points when useful.
+
+Use short paragraphs or bullet points
+when useful.
 """
 
     else:
 
         instruction = """
 Give a technical and academically detailed answer.
+
 Use appropriate technical terminology.
-Explain algorithms, methodology, and concepts accurately.
+
+Explain algorithms, methodology and concepts
+accurately.
 """
 
-    prompt = f"""
-You are a Research Paper Question Answering Assistant.
+    # --------------------------------------------------------
+    # Prompt
+    # --------------------------------------------------------
 
-Answer the user's question using ONLY the retrieved
-research paper context below.
+    prompt = f"""
+You are PaperLens, a research paper
+question-answering assistant.
+
+Answer the user's question using ONLY
+the retrieved research paper context.
 
 {instruction}
 
-Important rules:
+Rules:
+
 - Do not use outside knowledge.
 - Do not invent information.
 - Do not assume information that is not present.
-- If the answer cannot be found in the retrieved context,
-  respond exactly:
+- Base the answer on the retrieved paper.
+- If the answer cannot be found, respond exactly:
 
 "The information is not available in the research paper."
 
 User Question:
+
 {question}
 
 Retrieved Research Paper Context:
+
 {context}
 """
+
+    # --------------------------------------------------------
+    # Gemini
+    # --------------------------------------------------------
 
     response = client.models.generate_content(
         model="gemini-3-flash-preview",
@@ -363,21 +855,32 @@ Retrieved Research Paper Context:
     )
 
 
-# =========================================================
+# ============================================================
 # SIDEBAR
-# =========================================================
+# ============================================================
 
 with st.sidebar:
 
-    # ---------- BRAND ----------
+    # --------------------------------------------------------
+    # BRAND
+    # --------------------------------------------------------
 
-    st.title("📚 PaperLens")
-    st.caption("Research Paper Assistant")
+    st.markdown(
+        """
+        <div class="brand">
+            <div class="brand-logo">P</div>
+            <div class="brand-name">PaperLens</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    # ---------- NEW PAPER ----------
+    # --------------------------------------------------------
+    # NEW PAPER
+    # --------------------------------------------------------
 
     if st.button(
-        "＋ New paper",
+        "＋  New paper",
         use_container_width=True
     ):
 
@@ -389,70 +892,117 @@ with st.sidebar:
 
         st.rerun()
 
-    # ---------- RECENTS ----------
+    # --------------------------------------------------------
+    # RECENTS
+    # --------------------------------------------------------
 
-    st.markdown("### Recents")
+    st.markdown(
+        '<div class="side-label">Recents</div>',
+        unsafe_allow_html=True
+    )
 
     if st.session_state.recents:
 
-        # Show latest papers first
-        for recent_paper in reversed(
-            st.session_state.recents[-8:]
+        for index, recent in enumerate(
+            reversed(
+                st.session_state.recents[-8:]
+            )
         ):
 
             if st.button(
-                f"📄 {recent_paper}",
-                key=f"recent_{recent_paper}",
+                f"▸  {recent}",
+                key=f"recent_{index}_{recent}",
                 use_container_width=True
             ):
 
                 st.info(
-                    "Please upload the paper again to reopen it."
+                    "Upload this paper again to reopen it."
                 )
 
     else:
 
-        st.caption("No recent papers yet.")
+        st.markdown(
+            """
+            <div style="
+                color:#777;
+                font-size:13px;
+                padding:6px 9px;
+            ">
+                No recent papers
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    # ---------- CURRENT PAPER ----------
+    # --------------------------------------------------------
+    # CURRENT PAPER
+    # --------------------------------------------------------
 
-    st.markdown("### Current paper")
+    st.markdown(
+        '<div class="side-label">Current paper</div>',
+        unsafe_allow_html=True
+    )
 
     if st.session_state.paper_name:
 
-        st.caption(
-            f"📄 {st.session_state.paper_name}"
-        )
-
-        st.caption(
-            f"{len(st.session_state.pages)} pages"
+        st.markdown(
+            f"""
+            <div class="current-paper">
+                <div class="current-paper-title">
+                    {st.session_state.paper_name}
+                </div>
+                <div class="current-paper-pages">
+                    {len(st.session_state.pages)} pages
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
     else:
 
-        st.caption("No paper uploaded")
+        st.markdown(
+            """
+            <div style="
+                color:#777;
+                font-size:13px;
+                padding:6px 9px;
+            ">
+                No paper uploaded
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
-    # ---------- EXPLANATION MODE ----------
+    # --------------------------------------------------------
+    # EXPLANATION
+    # --------------------------------------------------------
 
-    st.markdown("### Explanation")
+    st.markdown(
+        '<div class="side-label">Response style</div>',
+        unsafe_allow_html=True
+    )
 
     st.session_state.explanation_mode = st.radio(
-        "Explanation level",
+        "Response style",
         ["Simple", "Technical"],
         index=(
             0
-            if st.session_state.explanation_mode == "Simple"
+            if st.session_state.explanation_mode
+            == "Simple"
             else 1
         ),
         label_visibility="collapsed"
     )
 
-    # ---------- CLEAR SESSION ----------
+    # --------------------------------------------------------
+    # CLEAR
+    # --------------------------------------------------------
 
     st.markdown("")
 
     if st.button(
-        "🗑️ Clear session",
+        "Clear session",
         use_container_width=True
     ):
 
@@ -464,53 +1014,74 @@ with st.sidebar:
 
         st.rerun()
 
-    # ---------- FOOTER ----------
+    # --------------------------------------------------------
+    # SIDEBAR BOTTOM
+    # --------------------------------------------------------
 
-    st.markdown("---")
-
-    st.caption(
-        "PaperLens • Academic AI Assistant"
+    st.markdown(
+        """
+        <div style="
+            position: fixed;
+            bottom: 15px;
+            left: 18px;
+            color:#777;
+            font-size:11px;
+        ">
+            PaperLens
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
 
-# =========================================================
-# MAIN HEADER
-# =========================================================
+# ============================================================
+# MAIN CONTENT
+# ============================================================
 
-st.title("📚 PaperLens")
+if not st.session_state.pages:
 
-st.caption(
-    "Understand research papers with AI-powered summaries and evidence-based answers."
-)
+    # --------------------------------------------------------
+    # WELCOME
+    # --------------------------------------------------------
 
+    st.markdown(
+        """
+        <div class="welcome">
 
-# =========================================================
-# PDF UPLOAD
-# =========================================================
+            <div class="welcome-logo">
+                P
+            </div>
 
-uploaded_file = st.file_uploader(
-    "Upload a research paper",
-    type=["pdf"],
-    help="Upload a text-based research paper in PDF format."
-)
+            <div class="welcome-title">
+                What do you want to understand?
+            </div>
 
+            <div class="welcome-subtitle">
+                Upload a research paper and explore it
+                with PaperLens.
+            </div>
 
-# =========================================================
-# PROCESS UPLOADED PAPER
-# =========================================================
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-if uploaded_file is not None:
+    # --------------------------------------------------------
+    # UPLOADER
+    # --------------------------------------------------------
 
-    # Only process if this is a new paper
-    if (
-        st.session_state.paper_name
-        != uploaded_file.name
-    ):
+    uploaded_file = st.file_uploader(
+        "Upload a research paper",
+        type=["pdf"],
+        label_visibility="collapsed"
+    )
+
+    if uploaded_file is not None:
 
         file_bytes = uploaded_file.getvalue()
 
         with st.spinner(
-            "Processing research paper..."
+            "Reading your research paper..."
         ):
 
             try:
@@ -520,14 +1091,19 @@ if uploaded_file is not None:
                 )
 
                 st.session_state.pages = pages
-                st.session_state.collection = collection
+
+                st.session_state.collection = (
+                    collection
+                )
+
                 st.session_state.paper_name = (
                     uploaded_file.name
                 )
+
                 st.session_state.summary = None
+
                 st.session_state.history = []
 
-                # Add to Recents
                 if (
                     uploaded_file.name
                     not in st.session_state.recents
@@ -538,8 +1114,10 @@ if uploaded_file is not None:
                     )
 
                 st.success(
-                    "Research paper processed successfully."
+                    "Paper is ready."
                 )
+
+                st.rerun()
 
             except Exception as e:
 
@@ -548,100 +1126,182 @@ if uploaded_file is not None:
                 )
 
 
-# =========================================================
-# PAPER OVERVIEW
-# =========================================================
+# ============================================================
+# PAPER LOADED
+# ============================================================
 
-if st.session_state.pages:
+else:
 
-    st.markdown("## 📄 Paper Overview")
+    # --------------------------------------------------------
+    # PAPER HEADER
+    # --------------------------------------------------------
 
     total_words = sum(
         len(page["text"].split())
         for page in st.session_state.pages
     )
 
-    col1, col2, col3 = st.columns(3)
+    st.markdown(
+        f"""
+        <div class="paper-header">
 
-    with col1:
+            <div class="paper-title">
+                {st.session_state.paper_name}
+            </div>
 
-        st.metric(
-            "Pages",
-            len(st.session_state.pages)
-        )
+            <div class="paper-meta">
+                {len(st.session_state.pages)} pages
+                · {total_words:,} words
+            </div>
 
-    with col2:
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        st.metric(
-            "Words",
-            f"{total_words:,}"
-        )
+    # --------------------------------------------------------
+    # SUMMARY BUTTON
+    # --------------------------------------------------------
 
-    with col3:
+    if st.session_state.summary is None:
 
-        st.metric(
-            "Status",
-            "Ready"
-        )
-
-
-# =========================================================
-# SUMMARY
-# =========================================================
-
-if st.session_state.pages:
-
-    st.markdown("## 📝 Research Summary")
-
-    if st.button(
-        "Generate Summary",
-        use_container_width=False
-    ):
-
-        with st.spinner(
-            "Analyzing the research paper..."
+        if st.button(
+            "Generate paper summary"
         ):
 
-            try:
+            with st.spinner(
+                "Analyzing the research paper..."
+            ):
 
-                st.session_state.summary = (
-                    generate_summary(
-                        st.session_state.pages
+                try:
+
+                    st.session_state.summary = (
+                        generate_summary(
+                            st.session_state.pages
+                        )
                     )
-                )
 
-            except Exception as e:
+                    st.rerun()
 
-                st.error(
-                    f"Unable to generate summary: {e}"
-                )
+                except Exception as e:
+
+                    st.error(
+                        f"Unable to generate summary: {e}"
+                    )
+
+
+    # --------------------------------------------------------
+    # SUMMARY
+    # --------------------------------------------------------
 
     if st.session_state.summary:
 
+        with st.expander(
+            "Paper summary",
+            expanded=True
+        ):
+
+            st.markdown(
+                st.session_state.summary
+            )
+
+
+    # --------------------------------------------------------
+    # PREVIOUS CHAT
+    # --------------------------------------------------------
+
+    for item in st.session_state.history:
+
+        # User
         st.markdown(
-            st.session_state.summary
+            f"""
+            <div class="user-message">
+                <div class="user-bubble">
+                    {item["question"]}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # Assistant
+        st.markdown(
+            """
+            <div class="assistant-message">
+
+                <div class="assistant-header">
+
+                    <div class="assistant-logo">
+                        P
+                    </div>
+
+                    <div class="assistant-name">
+                        PaperLens
+                    </div>
+
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown(
+            item["answer"]
         )
 
 
-# =========================================================
-# QUESTION ANSWERING
-# =========================================================
+        # Sources
+        if (
+            "chunks" in item
+            and item["chunks"]
+        ):
 
-if st.session_state.collection is not None:
+            st.markdown(
+                '<div class="source-title">Sources</div>',
+                unsafe_allow_html=True
+            )
+
+            for i in range(
+                len(item["chunks"])
+            ):
+
+                page = item["metadata"][i].get(
+                    "page",
+                    "Unknown"
+                )
+
+                distance = item["distances"][i]
+
+                with st.expander(
+                    f"Page {page} · Source {i + 1}"
+                ):
+
+                    st.write(
+                        item["chunks"][i]
+                    )
+
+                    st.caption(
+                        f"Relevance distance: {distance:.4f}"
+                    )
+
+
+    # --------------------------------------------------------
+    # CHAT INPUT
+    # --------------------------------------------------------
 
     st.markdown("---")
 
-    st.markdown("## 💬 Ask About the Paper")
-
     question = st.text_input(
-        "Ask a question",
+        "Ask about this paper",
         placeholder=(
-            "Example: What methodology is used in this research paper?"
-        )
+            "Ask anything about the research paper..."
+        ),
+        label_visibility="collapsed"
     )
 
     if st.button(
-        "Ask Question",
+        "Ask",
         type="primary"
     ):
 
@@ -654,7 +1314,7 @@ if st.session_state.collection is not None:
         else:
 
             with st.spinner(
-                "Searching the paper and generating an answer..."
+                "Thinking..."
             ):
 
                 try:
@@ -671,98 +1331,21 @@ if st.session_state.collection is not None:
                         st.session_state.explanation_mode
                     )
 
-                    # Store history
                     st.session_state.history.append(
                         {
                             "question": question,
-                            "answer": answer
+                            "answer": answer,
+                            "chunks": retrieved_chunks,
+                            "metadata": metadata,
+                            "ids": ids,
+                            "distances": distances
                         }
                     )
 
-                    # Answer
-                    st.markdown("### 💡 Answer")
-
-                    st.write(answer)
-
-                    # Sources
-                    st.markdown(
-                        "### 📚 Sources"
-                    )
-
-                    st.caption(
-                        "Relevant passages retrieved from the original research paper."
-                    )
-
-                    for i in range(
-                        len(retrieved_chunks)
-                    ):
-
-                        page = metadata[i].get(
-                            "page",
-                            "Unknown"
-                        )
-
-                        chunk = retrieved_chunks[i]
-
-                        distance = distances[i]
-
-                        with st.expander(
-                            f"📄 Page {page} — Source {i + 1}"
-                        ):
-
-                            st.write(chunk)
-
-                            st.caption(
-                                f"Source relevance distance: {distance:.4f}"
-                            )
+                    st.rerun()
 
                 except Exception as e:
 
                     st.error(
                         f"Unable to answer the question: {e}"
                     )
-
-
-# =========================================================
-# QUESTION HISTORY
-# =========================================================
-
-if st.session_state.history:
-
-    st.markdown("---")
-
-    st.markdown("## 🕘 Question History")
-
-    for item in reversed(
-        st.session_state.history
-    ):
-
-        with st.expander(
-            f"Q: {item['question']}"
-        ):
-
-            st.write(
-                item["answer"]
-            )
-
-
-# =========================================================
-# INITIAL STATE MESSAGE
-# =========================================================
-
-if not st.session_state.pages:
-
-    st.info(
-        "Upload a research paper PDF to get started."
-    )
-
-
-# =========================================================
-# FOOTER
-# =========================================================
-
-st.markdown("---")
-
-st.caption(
-    "PaperLens — Research Paper Explainer Assistant"
-)
