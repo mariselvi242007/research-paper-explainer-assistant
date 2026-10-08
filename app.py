@@ -1,36 +1,30 @@
 import streamlit as st
-import hashlib
-import io
-
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import chromadb
 from google import genai
+import hashlib
 
 
-# ============================================================
+# =========================================================
 # PAGE CONFIGURATION
-# ============================================================
+# =========================================================
 
 st.set_page_config(
     page_title="Research Paper Explainer",
-    page_icon="📄",
+    page_icon="📚",
     layout="wide"
 )
 
 
-# ============================================================
+# =========================================================
 # CUSTOM CSS
-# ============================================================
+# =========================================================
 
 st.markdown(
     """
     <style>
-
-    .main {
-        padding-top: 1rem;
-    }
 
     .main-title {
         text-align: center;
@@ -42,27 +36,30 @@ st.markdown(
     .subtitle {
         text-align: center;
         font-size: 18px;
+        color: #666666;
         margin-bottom: 30px;
     }
 
     .section-title {
-        font-size: 25px;
-        font-weight: 600;
+        font-size: 24px;
+        font-weight: 650;
         margin-top: 25px;
         margin-bottom: 15px;
     }
 
-    .source-box {
-        padding: 12px 16px;
-        border-radius: 10px;
+    .info-card {
+        padding: 18px;
+        border-radius: 12px;
         border: 1px solid #dddddd;
-        margin-bottom: 8px;
+        margin-bottom: 15px;
     }
 
     .footer {
         text-align: center;
-        margin-top: 30px;
+        color: #777777;
         font-size: 14px;
+        margin-top: 40px;
+        padding: 20px;
     }
 
     </style>
@@ -71,52 +68,42 @@ st.markdown(
 )
 
 
-# ============================================================
-# HEADER
-# ============================================================
+# =========================================================
+# TITLE
+# =========================================================
 
 st.markdown(
-    '<div class="main-title">📄 Research Paper Explainer</div>',
+    '<div class="main-title">📚 Research Paper Explainer Assistant</div>',
     unsafe_allow_html=True
 )
 
 st.markdown(
     '<div class="subtitle">'
-    'Understand research papers quickly and easily with AI'
+    'Upload a research paper and ask questions using AI-powered Retrieval-Augmented Generation.'
     '</div>',
     unsafe_allow_html=True
 )
 
 
-# ============================================================
+# =========================================================
 # GEMINI API
-# ============================================================
+# =========================================================
 
 try:
-
     api_key = st.secrets["GEMINI_API_KEY"]
-
 except Exception:
-
     st.error(
-        "Gemini API key is not configured."
+        "GEMINI_API_KEY is not configured. "
+        "Please add it in Streamlit Secrets."
     )
-
-    st.info(
-        "Add GEMINI_API_KEY in Streamlit Secrets."
-    )
-
     st.stop()
 
-
-client = genai.Client(
-    api_key=api_key
-)
+client = genai.Client(api_key=api_key)
 
 
-# ============================================================
-# EMBEDDING MODEL
-# ============================================================
+# =========================================================
+# LOAD EMBEDDING MODEL
+# =========================================================
 
 @st.cache_resource
 def load_embedding_model():
@@ -129,76 +116,60 @@ def load_embedding_model():
 embedding_model = load_embedding_model()
 
 
-# ============================================================
-# CHROMADB
-# ============================================================
+# =========================================================
+# CHROMA CLIENT
+# =========================================================
 
 @st.cache_resource
-def load_chroma_client():
+def get_chroma_client():
 
     return chromadb.Client()
 
 
-chroma_client = load_chroma_client()
+chroma_client = get_chroma_client()
 
 
-# ============================================================
+# =========================================================
 # SESSION STATE
-# ============================================================
-
-if "paper_processed" not in st.session_state:
-    st.session_state.paper_processed = False
-
-if "paper_name" not in st.session_state:
-    st.session_state.paper_name = ""
-
-if "page_count" not in st.session_state:
-    st.session_state.page_count = 0
-
-if "chunk_count" not in st.session_state:
-    st.session_state.chunk_count = 0
+# =========================================================
 
 if "collection" not in st.session_state:
     st.session_state.collection = None
 
-if "summary" not in st.session_state:
-    st.session_state.summary = None
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "file_hash" not in st.session_state:
-    st.session_state.file_hash = None
+if "paper_name" not in st.session_state:
+    st.session_state.paper_name = None
 
 if "pages" not in st.session_state:
     st.session_state.pages = []
 
+if "summary" not in st.session_state:
+    st.session_state.summary = None
 
-# ============================================================
-# PDF EXTRACTION
-# ============================================================
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+
+# =========================================================
+# PDF PAGE EXTRACTION
+# =========================================================
 
 def extract_pdf_pages(file_bytes):
 
-    pdf_stream = io.BytesIO(
-        file_bytes
-    )
-
-    reader = PdfReader(
-        pdf_stream
-    )
-
     pages = []
 
-    for page_number, page in enumerate(
-        reader.pages,
-        start=1
-    ):
+    reader = PdfReader(file_bytes)
+
+    for page_number, page in enumerate(reader.pages, start=1):
 
         page_text = page.extract_text()
 
-        if page_text and page_text.strip():
+        if page_text:
+            page_text = page_text.strip()
 
+        else:
+            page_text = ""
+
+        if page_text:
             pages.append(
                 {
                     "page": page_number,
@@ -206,12 +177,12 @@ def extract_pdf_pages(file_bytes):
                 }
             )
 
-    return pages, len(reader.pages)
+    return pages
 
 
-# ============================================================
-# CREATE CHUNKS
-# ============================================================
+# =========================================================
+# CREATE PAGE-AWARE CHUNKS
+# =========================================================
 
 def create_chunks(pages):
 
@@ -221,29 +192,28 @@ def create_chunks(pages):
     )
 
     chunks = []
-
     page_numbers = []
 
     for page_data in pages:
 
+        page_number = page_data["page"]
+        page_text = page_data["text"]
+
         page_chunks = text_splitter.split_text(
-            page_data["text"]
+            page_text
         )
 
         for chunk in page_chunks:
 
             chunks.append(chunk)
-
-            page_numbers.append(
-                page_data["page"]
-            )
+            page_numbers.append(page_number)
 
     return chunks, page_numbers
 
 
-# ============================================================
-# CREATE UNIQUE COLLECTION
-# ============================================================
+# =========================================================
+# CREATE UNIQUE CHROMA COLLECTION NAME
+# =========================================================
 
 def create_collection_name(file_bytes):
 
@@ -251,30 +221,31 @@ def create_collection_name(file_bytes):
         file_bytes
     ).hexdigest()
 
-    return (
-        "paper_"
-        + file_hash[:12]
-    )
+    return f"research_paper_{file_hash[:10]}"
 
 
-# ============================================================
+# =========================================================
 # PROCESS PDF
-# ============================================================
+# =========================================================
 
 def process_pdf(file_bytes):
 
-    pages, total_pages = extract_pdf_pages(
+    pages = extract_pdf_pages(
         file_bytes
     )
+
+    if not pages:
+        raise ValueError(
+            "No readable text was found in the PDF."
+        )
 
     chunks, page_numbers = create_chunks(
         pages
     )
 
     if not chunks:
-
         raise ValueError(
-            "No readable text was found in the PDF."
+            "No text chunks were created from the PDF."
         )
 
     embeddings = embedding_model.encode(
@@ -290,9 +261,36 @@ def process_pdf(file_bytes):
         name=collection_name
     )
 
-    if collection.count() == 0:
+    # Avoid duplicate insertion when the same paper
+    # is processed again during the Streamlit session.
+    try:
 
-        ids = [
+        existing_count = collection.count()
+
+        if existing_count == 0:
+
+            chunk_ids = [
+                f"chunk_{i}"
+                for i in range(len(chunks))
+            ]
+
+            metadatas = [
+                {
+                    "page": page_numbers[i]
+                }
+                for i in range(len(chunks))
+            ]
+
+            collection.add(
+                ids=chunk_ids,
+                documents=chunks,
+                embeddings=embeddings.tolist(),
+                metadatas=metadatas
+            )
+
+    except Exception:
+
+        chunk_ids = [
             f"chunk_{i}"
             for i in range(len(chunks))
         ]
@@ -301,57 +299,51 @@ def process_pdf(file_bytes):
             {
                 "page": page_numbers[i]
             }
-
             for i in range(len(chunks))
         ]
 
         collection.add(
-            ids=ids,
+            ids=chunk_ids,
             documents=chunks,
             embeddings=embeddings.tolist(),
             metadatas=metadatas
         )
 
-    return (
-        collection,
-        pages,
-        total_pages,
-        len(chunks)
-    )
+    return pages, collection
 
 
-# ============================================================
-# GENERATE SUMMARY
-# ============================================================
+# =========================================================
+# GENERATE PAPER SUMMARY
+# =========================================================
 
 def generate_summary(pages):
 
-    paper_text = "\n\n".join(
-        page["text"]
-        for page in pages
+    full_text = "\n\n".join(
+        [
+            f"Page {p['page']}:\n{p['text']}"
+            for p in pages
+        ]
     )
 
-    # Limit very large papers
-    paper_text = paper_text[:100000]
+    # Limit very large papers for this demo.
+    full_text = full_text[:100000]
 
     prompt = f"""
 You are a Research Paper Explainer Assistant.
 
-Read the research paper below.
+Summarize ONLY the research paper provided below.
 
-Create a clear and well-organized summary.
+Do not use outside knowledge.
 
-START DIRECTLY WITH:
+Start the answer directly with:
 
 1. Research Objective
 
-Do NOT write an introductory sentence such as:
+Do not write an introduction such as:
+"This summary is based on..."
+Do not mention that you are an AI.
 
-"This summary is based on the research paper..."
-"This paper discusses..."
-"Here is a summary..."
-
-Include these sections:
+Use exactly these sections:
 
 1. Research Objective
 2. Problem Statement
@@ -362,19 +354,10 @@ Include these sections:
 7. Limitations
 8. Conclusion
 
-Rules:
-
-- Use ONLY information from the research paper.
-- Do not invent information.
-- Do not use outside knowledge.
-- Explain technical terms briefly.
-- Use simple language.
-- Use bullet points where useful.
-- Keep the answer organized and easy to read.
+Explain each section clearly using simple but technically correct language.
 
 Research Paper:
-
-{paper_text}
+{full_text}
 """
 
     response = client.models.generate_content(
@@ -385,9 +368,9 @@ Research Paper:
     return response.text
 
 
-# ============================================================
-# ASK QUESTION
-# ============================================================
+# =========================================================
+# ASK QUESTION USING RAG
+# =========================================================
 
 def ask_question(
     question,
@@ -395,17 +378,17 @@ def ask_question(
     explanation_mode
 ):
 
-    # --------------------------------------------------------
+    # -----------------------------------------------------
     # Convert question into embedding
-    # --------------------------------------------------------
+    # -----------------------------------------------------
 
     question_embedding = embedding_model.encode(
         [question]
     )
 
-    # --------------------------------------------------------
+    # -----------------------------------------------------
     # Retrieve relevant chunks
-    # --------------------------------------------------------
+    # -----------------------------------------------------
 
     results = collection.query(
         query_embeddings=question_embedding.tolist(),
@@ -420,77 +403,87 @@ def ask_question(
 
     distances = results["distances"][0]
 
+    # -----------------------------------------------------
+    # Create context
+    # -----------------------------------------------------
+
+    context_parts = []
+
+    for i, chunk in enumerate(retrieved_chunks):
+
+        page = retrieved_metadata[i].get(
+            "page",
+            "Unknown"
+        )
+
+        context_parts.append(
+            f"""
+Source {i + 1}
+Page: {page}
+
+{chunk}
+"""
+        )
+
     context = "\n\n".join(
-        retrieved_chunks
+        context_parts
     )
 
-    # --------------------------------------------------------
-    # Explanation type
-    # --------------------------------------------------------
+    # -----------------------------------------------------
+    # Explanation mode
+    # -----------------------------------------------------
 
     if explanation_mode == "Simple":
 
-        instruction = """
-Explain the answer in very simple language.
+        mode_instruction = """
+Explain the answer in very simple English.
 
-Assume the reader is a beginner.
+Assume the user is a beginner.
 
-Avoid difficult technical terms.
-
-If you use a technical term,
-briefly explain its meaning.
-
-Use short paragraphs and bullet points.
+Use short sentences and easy technical explanations.
 """
 
     else:
 
-        instruction = """
-Give a detailed technical explanation.
+        mode_instruction = """
+Explain the answer at a technical level.
 
-Use the technical terminology
-mentioned in the research paper.
-
-Include important algorithms,
-methods, datasets, models,
-and technical concepts when relevant.
+Include relevant algorithms, methods,
+models, technical concepts, and reasoning
+when they are available in the paper.
 """
 
-    # --------------------------------------------------------
-    # Prompt
-    # --------------------------------------------------------
+    # -----------------------------------------------------
+    # Gemini prompt
+    # -----------------------------------------------------
 
     prompt = f"""
 You are a Research Paper Explainer Assistant.
 
-Answer the user's question using ONLY
-the research paper context below.
+Answer the user's question using ONLY the
+research paper context provided below.
 
-{instruction}
+Do not use outside knowledge.
 
-IMPORTANT RULES:
+{mode_instruction}
 
-- Do not use outside knowledge.
-- Do not invent information.
-- Do not make assumptions.
-- If the answer is not available in the
-  provided research paper context, say:
+If the information is not available in the
+research paper, say exactly:
 
-"The information is not available
-in the research paper."
+"The information is not available in the research paper."
+
+Do not invent information.
 
 Research Paper Context:
-
 {context}
 
 User Question:
-
 {question}
 """
 
-    # --------------------------------------------------------
-    # Gemini
-    # --------------------------------------------------------
+    # -----------------------------------------------------
+    # Generate answer
+    # -----------------------------------------------------
 
     response = client.models.generate_content(
         model="gemini-3-flash-preview",
@@ -499,60 +492,51 @@ User Question:
 
     return (
         response.text,
+        retrieved_chunks,
         retrieved_metadata,
         retrieved_ids,
         distances
     )
 
 
-# ============================================================
+# =========================================================
 # SIDEBAR
-# ============================================================
+# =========================================================
 
 with st.sidebar:
 
-    st.markdown(
-        "## 📄 Research Paper Explainer"
-    )
+    st.header("⚙️ Assistant")
 
     st.write(
-        "Upload a research paper and "
-        "understand it using AI."
+        "Upload a research paper and use the "
+        "assistant to understand it."
     )
 
     st.divider()
 
-    st.markdown(
-        "### ✨ Features"
-    )
+    st.subheader("Features")
 
-    st.write("📤 Upload PDF")
-
-    st.write("📝 Generate Summary")
-
-    st.write("💬 Ask Questions")
-
-    st.write("📘 Simple Explanation")
-
-    st.write("🔬 Technical Explanation")
-
-    st.write("📚 Page References")
+    st.write("📄 PDF Upload")
+    st.write("📝 Automatic Summary")
+    st.write("🔎 Question Answering")
+    st.write("🧠 Simple / Technical Mode")
+    st.write("📚 Page-Based Sources")
+    st.write("🔗 RAG-based Retrieval")
 
     st.divider()
 
     st.caption(
-        "AI-powered research paper assistant"
+        "Embeddings, vector database and retrieval "
+        "work in the backend."
     )
 
 
-# ============================================================
-# UPLOAD PDF
-# ============================================================
+# =========================================================
+# PDF UPLOAD
+# =========================================================
 
 st.markdown(
-    '<div class="section-title">'
-    '📤 Upload Your Research Paper'
-    '</div>',
+    '<div class="section-title">📄 Upload Research Paper</div>',
     unsafe_allow_html=True
 )
 
@@ -562,155 +546,124 @@ uploaded_file = st.file_uploader(
 )
 
 
-# ============================================================
-# PROCESS PDF
-# ============================================================
+# =========================================================
+# PROCESS UPLOADED PDF
+# =========================================================
 
 if uploaded_file is not None:
 
     file_bytes = uploaded_file.getvalue()
 
-    current_hash = hashlib.md5(
-        file_bytes
-    ).hexdigest()
+    # Detect whether this is a new paper
+    new_paper = (
+        st.session_state.paper_name
+        != uploaded_file.name
+    )
 
-    if current_hash != st.session_state.file_hash:
+    if new_paper:
 
         with st.spinner(
-            "Reading and preparing your research paper..."
+            "Processing research paper..."
         ):
 
             try:
 
-                (
-                    collection,
-                    pages,
-                    page_count,
-                    chunk_count
-                ) = process_pdf(
+                pages, collection = process_pdf(
                     file_bytes
                 )
 
-                st.session_state.collection = (
-                    collection
-                )
+                st.session_state.pages = pages
 
-                st.session_state.pages = (
-                    pages
-                )
+                st.session_state.collection = collection
 
                 st.session_state.paper_name = (
                     uploaded_file.name
                 )
 
-                st.session_state.page_count = (
-                    page_count
-                )
-
-                st.session_state.chunk_count = (
-                    chunk_count
-                )
-
-                st.session_state.file_hash = (
-                    current_hash
-                )
-
-                st.session_state.paper_processed = (
-                    True
-                )
-
                 st.session_state.summary = None
 
-                st.session_state.chat_history = []
+                st.session_state.history = []
 
                 st.success(
-                    "✅ Research paper is ready!"
+                    "Research paper processed successfully!"
                 )
 
             except Exception as e:
 
                 st.error(
-                    f"Unable to process the PDF: {e}"
+                    f"Error processing PDF: {e}"
                 )
 
+                st.stop()
 
-# ============================================================
-# APPLICATION CONTENT
-# ============================================================
 
-if st.session_state.paper_processed:
+# =========================================================
+# PAPER INFORMATION
+# =========================================================
 
-    # ========================================================
-    # PAPER INFORMATION
-    # ========================================================
+if st.session_state.collection is not None:
 
     st.markdown(
-        '<div class="section-title">'
-        '📑 Paper Information'
-        '</div>',
+        '<div class="section-title">📋 Paper Information</div>',
         unsafe_allow_html=True
     )
 
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
 
-        st.write("**Paper**")
-
-        st.write(
-            st.session_state.paper_name
+        st.metric(
+            "Pages",
+            len(st.session_state.pages)
         )
 
     with col2:
 
-        st.write("**Pages**")
+        st.metric(
+            "Paper",
+            st.session_state.paper_name
+        )
 
-        st.write(
-            st.session_state.page_count
+    with col3:
+
+        st.metric(
+            "Knowledge Base",
+            "Ready"
         )
 
 
-    st.divider()
-
-
-    # ========================================================
+    # =====================================================
     # SUMMARY
-    # ========================================================
+    # =====================================================
 
     st.markdown(
-        '<div class="section-title">'
-        '📝 Paper Summary'
-        '</div>',
+        '<div class="section-title">📝 Research Paper Summary</div>',
         unsafe_allow_html=True
     )
 
     if st.button(
-        "✨ Generate Summary",
-        use_container_width=True
+        "Generate Summary",
+        use_container_width=False
     ):
 
         with st.spinner(
-            "Generating paper summary..."
+            "Generating summary..."
         ):
 
             try:
 
-                st.session_state.summary = (
-                    generate_summary(
-                        st.session_state.pages
-                    )
+                summary = generate_summary(
+                    st.session_state.pages
                 )
+
+                st.session_state.summary = summary
 
             except Exception as e:
 
                 st.error(
-                    f"Unable to generate summary: {e}"
+                    f"Error generating summary: {e}"
                 )
 
-
-    # --------------------------------------------------------
-    # Display summary
-    # --------------------------------------------------------
 
     if st.session_state.summary:
 
@@ -719,31 +672,21 @@ if st.session_state.paper_processed:
         )
 
 
-    st.divider()
-
-
-    # ========================================================
-    # ASK QUESTIONS
-    # ========================================================
+    # =====================================================
+    # QUESTION ANSWERING
+    # =====================================================
 
     st.markdown(
-        '<div class="section-title">'
-        '💬 Ask Questions About Your Paper'
-        '</div>',
+        '<div class="section-title">🤖 Ask Questions</div>',
         unsafe_allow_html=True
     )
 
     st.write(
-        "Ask a question about the uploaded research paper."
+        "Ask any question about the uploaded research paper."
     )
 
-
-    # --------------------------------------------------------
-    # Explanation mode
-    # --------------------------------------------------------
-
     explanation_mode = st.radio(
-        "Explanation type",
+        "Explanation Mode",
         [
             "Simple",
             "Technical"
@@ -751,35 +694,20 @@ if st.session_state.paper_processed:
         horizontal=True
     )
 
-
-    # --------------------------------------------------------
-    # Question
-    # --------------------------------------------------------
-
     question = st.text_input(
-        "Your question",
-        placeholder=(
-            "Example: What methodology is used "
-            "in this research paper?"
-        )
+        "Enter your question",
+        placeholder="Example: What methodology is used in this research paper?"
     )
 
 
-    # --------------------------------------------------------
-    # Ask button
-    # --------------------------------------------------------
+    # =====================================================
+    # ASK BUTTON
+    # =====================================================
 
-    ask_button = st.button(
-        "🤖 Ask Question",
+    if st.button(
+        "🔍 Ask Question",
         use_container_width=True
-    )
-
-
-    # ========================================================
-    # ANSWER
-    # ========================================================
-
-    if ask_button:
+    ):
 
         if not question.strip():
 
@@ -790,13 +718,14 @@ if st.session_state.paper_processed:
         else:
 
             with st.spinner(
-                "Finding the answer..."
+                "Searching the research paper..."
             ):
 
                 try:
 
                     (
                         answer,
+                        retrieved_chunks,
                         metadata,
                         ids,
                         distances
@@ -806,22 +735,18 @@ if st.session_state.paper_processed:
                         explanation_mode
                     )
 
-
-                    # ========================================
-                    # Save question
-                    # ========================================
-
-                    st.session_state.chat_history.append(
+                    # Save history
+                    st.session_state.history.append(
                         {
                             "question": question,
-                            "answer": answer
+                            "answer": answer,
+                            "mode": explanation_mode
                         }
                     )
 
-
-                    # ========================================
-                    # Answer heading
-                    # ========================================
+                    # =====================================
+                    # ANSWER
+                    # =====================================
 
                     st.markdown(
                         '<div class="section-title">'
@@ -830,19 +755,14 @@ if st.session_state.paper_processed:
                         unsafe_allow_html=True
                     )
 
-
-                    # ========================================
-                    # Clean answer
-                    # ========================================
-
                     st.markdown(
                         answer
                     )
 
 
-                    # ========================================
-                    # Sources
-                    # ========================================
+                    # =====================================
+                    # SOURCES
+                    # =====================================
 
                     st.markdown(
                         '<div class="section-title">'
@@ -851,50 +771,49 @@ if st.session_state.paper_processed:
                         unsafe_allow_html=True
                     )
 
+                    st.write(
+                        "These are the relevant sections "
+                        "retrieved from the research paper."
+                    )
 
-                    unique_pages = []
-
-                    for metadata_item in metadata:
-
-                        page = metadata_item.get(
-                            "page"
-                        )
-
-                        if page not in unique_pages:
-
-                            unique_pages.append(
-                                page
-                            )
-
-
-                    for page in sorted(
-                        unique_pages
+                    for i in range(
+                        len(retrieved_chunks)
                     ):
 
-                        st.markdown(
-                            f"""
-                            <div class="source-box">
-                            📄 Page {page}
-                            </div>
-                            """,
-                            unsafe_allow_html=True
+                        page = metadata[i].get(
+                            "page",
+                            "Unknown"
                         )
+
+                        chunk = retrieved_chunks[i]
+
+                        distance = distances[i]
+
+                        with st.expander(
+                            f"📄 Page {page} — Source {i + 1}"
+                        ):
+
+                            st.write(
+                                chunk
+                            )
+
+                            st.caption(
+                                f"Retrieval distance: {distance:.4f}"
+                            )
 
 
                 except Exception as e:
 
                     st.error(
-                        f"Unable to answer the question: {e}"
+                        f"Error answering question: {e}"
                     )
 
 
-    # ========================================================
+    # =====================================================
     # QUESTION HISTORY
-    # ========================================================
+    # =====================================================
 
-    if st.session_state.chat_history:
-
-        st.divider()
+    if st.session_state.history:
 
         st.markdown(
             '<div class="section-title">'
@@ -903,28 +822,44 @@ if st.session_state.paper_processed:
             unsafe_allow_html=True
         )
 
-        for item in reversed(
-            st.session_state.chat_history
+        for i, item in enumerate(
+            reversed(st.session_state.history)
         ):
 
             with st.expander(
-                item["question"]
+                f"Question: {item['question']}"
             ):
 
-                st.markdown(
+                st.caption(
+                    f"Mode: {item['mode']}"
+                )
+
+                st.write(
                     item["answer"]
                 )
 
 
-# ============================================================
-# FOOTER
-# ============================================================
+# =========================================================
+# NO PDF MESSAGE
+# =========================================================
 
-st.divider()
+else:
+
+    st.info(
+        "👆 Upload a research paper PDF to get started."
+    )
+
+
+# =========================================================
+# FOOTER
+# =========================================================
 
 st.markdown(
-    '<div class="footer">'
-    '📄 Research Paper Explainer Assistant'
-    '</div>',
+    """
+    <div class="footer">
+        Research Paper Explainer Assistant |
+        Powered by RAG, ChromaDB, Sentence Transformers and Gemini
+    </div>
+    """,
     unsafe_allow_html=True
 )
