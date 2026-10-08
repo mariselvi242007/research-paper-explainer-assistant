@@ -120,6 +120,18 @@ header[data-testid="stHeader"] {background: transparent;}
 }
 .st-key-act_delete_yes button > div, .st-key-act_delete_no button > div {justify-content: center !important;}
 
+/* ---------- Answer style buttons ---------- */
+[class*="st-key-mode_"] [data-testid="stBaseButton-primary"] {
+    background: #2F5D8A !important; border: 1px solid #2F5D8A !important; color: #fff !important;
+}
+[class*="st-key-mode_"] [data-testid="stBaseButton-primary"] p {color: #fff !important;}
+[class*="st-key-mode_"] [data-testid="stBaseButton-secondary"] {
+    background: #fff !important; border: 1px solid #D5DDE6 !important; color: #1B2430 !important;
+}
+[class*="st-key-mode_"] [data-testid="stBaseButton-secondary"]:hover {border-color: #2F5D8A !important; color: #2F5D8A !important;}
+[class*="st-key-mode_"] button > div {justify-content: center !important;}
+[class*="st-key-mode_"] button p {text-align: center !important;}
+
 /* ---------- Blue accent (replaces Streamlit's default red) ---------- */
 [data-testid="stBaseButton-segmented_controlActive"],
 [data-testid="stSegmentedControl"] button[aria-checked="true"],
@@ -337,6 +349,10 @@ def delete_chat(chat_id):
 
     if st.session_state.current_chat_id == chat_id:
         new_chat()
+
+
+def set_mode(mode_name):
+    st.session_state.explanation_mode = mode_name
 
 
 def set_confirm_delete(chat_id):
@@ -585,13 +601,20 @@ with st.sidebar:
 
     # Answer style, at the top
     st.caption("Answer style")
-    st.segmented_control(
-        "Answer style",
-        MODES,
-        key="explanation_mode",
-        label_visibility="collapsed",
-    )
     active_mode = st.session_state.explanation_mode or "Simple"
+
+    mode_cols = st.columns(2)
+    for col, mode_name in zip(mode_cols, MODES):
+        with col:
+            st.button(
+                mode_name,
+                key=f"mode_{mode_name}",
+                on_click=set_mode,
+                args=(mode_name,),
+                use_container_width=True,
+                type="primary" if mode_name == active_mode else "secondary",
+            )
+
     st.caption(MODE_HINTS[active_mode])
 
     if st.button("New chat", key="new_chat_btn", use_container_width=True):
