@@ -9,7 +9,7 @@ import hashlib
 
 
 # ============================================================
-# PAGE CONFIG
+# PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
@@ -45,12 +45,9 @@ if "recents" not in st.session_state:
 if "explanation_mode" not in st.session_state:
     st.session_state.explanation_mode = "Simple"
 
-if "show_uploader" not in st.session_state:
-    st.session_state.show_uploader = False
-
 
 # ============================================================
-# GEMINI CLIENT
+# GEMINI
 # ============================================================
 
 try:
@@ -90,15 +87,16 @@ chroma_client = load_chroma_client()
 
 
 # ============================================================
-# PDF TEXT EXTRACTION
+# PDF EXTRACTION
 # ============================================================
 
 def extract_pdf_pages(file_bytes):
 
     pages = []
 
-    # Convert bytes into a file-like object.
-    # This fixes the seek() error.
+    # Convert bytes to file-like object.
+    # Fixes:
+    # 'bytes' object has no attribute 'seek'
 
     pdf_file = BytesIO(file_bytes)
 
@@ -132,7 +130,7 @@ def extract_pdf_pages(file_bytes):
 
 
 # ============================================================
-# CHUNKING
+# CREATE CHUNKS
 # ============================================================
 
 def create_chunks(pages):
@@ -246,7 +244,7 @@ def process_pdf(file_bytes):
 
 
 # ============================================================
-# SUMMARY
+# SUMMARY GENERATION
 # ============================================================
 
 def generate_summary(pages):
@@ -306,7 +304,7 @@ Research Paper:
 
 
 # ============================================================
-# RAG QUESTION ANSWERING
+# QUESTION ANSWERING
 # ============================================================
 
 def ask_question(
@@ -321,17 +319,13 @@ def ask_question(
             "Gemini API key is not configured."
         )
 
-    # --------------------------------------------------------
     # Question embedding
-    # --------------------------------------------------------
 
     question_embedding = embedding_model.encode(
         [question]
     )[0]
 
-    # --------------------------------------------------------
     # Retrieve relevant chunks
-    # --------------------------------------------------------
 
     results = collection.query(
         query_embeddings=[
@@ -357,9 +351,7 @@ def ask_question(
             for _ in retrieved_chunks
         ]
 
-    # --------------------------------------------------------
-    # Context
-    # --------------------------------------------------------
+    # Build context
 
     context = ""
 
@@ -377,9 +369,7 @@ def ask_question(
             f"{chunk}"
         )
 
-    # --------------------------------------------------------
     # Explanation mode
-    # --------------------------------------------------------
 
     if explanation_mode == "Simple":
 
@@ -390,7 +380,7 @@ Assume the user is a beginner.
 
 Avoid unnecessary technical jargon.
 
-Use short paragraphs or bullet points
+Use clear paragraphs and bullet points
 when useful.
 """
 
@@ -404,10 +394,6 @@ Use appropriate technical terminology.
 Explain algorithms, methodology and concepts
 accurately.
 """
-
-    # --------------------------------------------------------
-    # Prompt
-    # --------------------------------------------------------
 
     prompt = f"""
 You are PaperLens, a research paper
@@ -423,7 +409,7 @@ Rules:
 - Do not use outside knowledge.
 - Do not invent information.
 - Do not assume information that is not present.
-- Base the answer on the retrieved paper.
+- Base the answer on the research paper.
 - If the answer cannot be found, respond exactly:
 
 "The information is not available in the research paper."
@@ -457,19 +443,15 @@ Retrieved Research Paper Context:
 
 with st.sidebar:
 
-    # --------------------------------------------------------
-    # APP NAME
-    # --------------------------------------------------------
-
-    st.markdown("### PaperLens")
+    st.title("PaperLens")
 
     st.caption(
         "Research Paper Assistant"
     )
 
-    # --------------------------------------------------------
-    # NEW CHAT / NEW PAPER
-    # --------------------------------------------------------
+    st.divider()
+
+    # New chat
 
     if st.button(
         "＋ New chat",
@@ -477,22 +459,14 @@ with st.sidebar:
     ):
 
         st.session_state.collection = None
-
         st.session_state.paper_name = None
-
         st.session_state.pages = []
-
         st.session_state.summary = None
-
         st.session_state.history = []
-
-        st.session_state.show_uploader = True
 
         st.rerun()
 
-    # --------------------------------------------------------
-    # RECENTS
-    # --------------------------------------------------------
+    # Recents
 
     st.markdown("**Recents**")
 
@@ -502,11 +476,8 @@ with st.sidebar:
             st.session_state.recents[-8:]
         ):
 
-            st.button(
-                recent,
-                key=f"recent_{recent}",
-                use_container_width=True,
-                disabled=True
+            st.caption(
+                f"• {recent}"
             )
 
     else:
@@ -515,15 +486,15 @@ with st.sidebar:
             "No recent papers"
         )
 
-    # --------------------------------------------------------
-    # CURRENT PAPER
-    # --------------------------------------------------------
+    st.divider()
+
+    # Current paper
 
     st.markdown("**Current paper**")
 
     if st.session_state.paper_name:
 
-        st.caption(
+        st.write(
             st.session_state.paper_name
         )
 
@@ -537,9 +508,9 @@ with st.sidebar:
             "No paper uploaded"
         )
 
-    # --------------------------------------------------------
-    # RESPONSE STYLE
-    # --------------------------------------------------------
+    # Response style
+
+    st.divider()
 
     st.markdown("**Response style**")
 
@@ -558,9 +529,9 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    # --------------------------------------------------------
-    # CLEAR
-    # --------------------------------------------------------
+    st.divider()
+
+    # Clear
 
     if st.button(
         "Clear session",
@@ -568,42 +539,42 @@ with st.sidebar:
     ):
 
         st.session_state.collection = None
-
         st.session_state.paper_name = None
-
         st.session_state.pages = []
-
         st.session_state.summary = None
-
         st.session_state.history = []
 
         st.rerun()
 
 
 # ============================================================
-# MAIN AREA
-# ============================================================
-
-# ============================================================
-# NO PAPER
+# MAIN CONTENT
 # ============================================================
 
 if not st.session_state.pages:
+
+    # --------------------------------------------------------
+    # WELCOME
+    # --------------------------------------------------------
 
     st.title(
         "PaperLens"
     )
 
+    st.subheader(
+        "Understand your research paper"
+    )
+
     st.write(
-        "Upload a research paper and start exploring it."
+        "Upload a research paper to generate a summary, "
+        "ask questions, and explore the supporting passages."
     )
 
     st.write("")
 
     uploaded_file = st.file_uploader(
-        "Upload PDF",
-        type=["pdf"],
-        label_visibility="visible"
+        "Upload research paper",
+        type=["pdf"]
     )
 
     if uploaded_file is not None:
@@ -611,7 +582,7 @@ if not st.session_state.pages:
         file_bytes = uploaded_file.getvalue()
 
         with st.spinner(
-            "Processing your research paper..."
+            "Processing research paper..."
         ):
 
             try:
@@ -653,35 +624,48 @@ if not st.session_state.pages:
 
 
 # ============================================================
-# PAPER LOADED
+# PAPER INTERFACE
 # ============================================================
 
 else:
 
     # --------------------------------------------------------
-    # TOP BAR
+    # TOP
     # --------------------------------------------------------
 
     st.title(
         st.session_state.paper_name
     )
 
-    st.caption(
-        f"{len(st.session_state.pages)} pages"
+    total_words = sum(
+        len(page["text"].split())
+        for page in st.session_state.pages
     )
 
+    st.caption(
+        f"{len(st.session_state.pages)} pages  ·  "
+        f"{total_words:,} words"
+    )
+
+    st.divider()
+
     # --------------------------------------------------------
-    # SUMMARY
+    # QUICK ACTIONS
     # --------------------------------------------------------
 
-    if st.session_state.summary is None:
+    col1, col2, col3 = st.columns(
+        [1, 1, 3]
+    )
+
+    with col1:
 
         if st.button(
-            "Generate summary"
+            "Generate summary",
+            use_container_width=True
         ):
 
             with st.spinner(
-                "Analyzing the research paper..."
+                "Generating summary..."
             ):
 
                 try:
@@ -700,187 +684,197 @@ else:
                         f"Unable to generate summary: {e}"
                     )
 
+    with col2:
+
+        st.write("")
+
     # --------------------------------------------------------
-    # SHOW SUMMARY
+    # SUMMARY
     # --------------------------------------------------------
 
     if st.session_state.summary:
 
-        with st.chat_message(
-            "assistant"
-        ):
+        st.subheader(
+            "Paper Summary"
+        )
 
-            st.markdown(
-                "**Paper summary**"
-            )
+        st.markdown(
+            st.session_state.summary
+        )
 
-            st.markdown(
-                st.session_state.summary
-            )
-
+        st.divider()
 
     # --------------------------------------------------------
-    # CHAT HISTORY
+    # CONVERSATION
     # --------------------------------------------------------
 
-    for item in st.session_state.history:
+    if st.session_state.history:
 
-        # User message
-        with st.chat_message(
-            "user"
-        ):
+        st.subheader(
+            "Conversation"
+        )
 
-            st.markdown(
-                item["question"]
+        for item in st.session_state.history:
+
+            # ------------------------------------------------
+            # QUESTION / ANSWER LAYOUT
+            # ------------------------------------------------
+
+            question_col, answer_col = st.columns(
+                [1, 2]
             )
 
-        # Assistant message
-        with st.chat_message(
-            "assistant"
-        ):
+            # Question - LEFT
 
-            st.markdown(
-                item["answer"]
-            )
-
-            # Sources
-            if (
-                "chunks" in item
-                and item["chunks"]
-            ):
+            with question_col:
 
                 st.markdown(
-                    "**Sources**"
+                    "**You**"
                 )
 
-                for i in range(
-                    len(item["chunks"])
+                st.info(
+                    item["question"]
+                )
+
+            # Answer - RIGHT
+
+            with answer_col:
+
+                st.markdown(
+                    "**PaperLens**"
+                )
+
+                st.write(
+                    item["answer"]
+                )
+
+                # Sources
+
+                if (
+                    "chunks" in item
+                    and item["chunks"]
                 ):
-
-                    page = item[
-                        "metadata"
-                    ][i].get(
-                        "page",
-                        "Unknown"
-                    )
-
-                    distance = item[
-                        "distances"
-                    ][i]
-
-                    with st.expander(
-                        f"Page {page} · Source {i + 1}"
-                    ):
-
-                        st.write(
-                            item["chunks"][i]
-                        )
-
-                        st.caption(
-                            f"Relevance distance: {distance:.4f}"
-                        )
-
-
-    # --------------------------------------------------------
-    # CHAT INPUT
-    # --------------------------------------------------------
-
-    question = st.chat_input(
-        "Ask anything about this paper..."
-    )
-
-    if question:
-
-        # ----------------------------------------------------
-        # USER MESSAGE
-        # ----------------------------------------------------
-
-        with st.chat_message(
-            "user"
-        ):
-
-            st.markdown(
-                question
-            )
-
-        # ----------------------------------------------------
-        # AI RESPONSE
-        # ----------------------------------------------------
-
-        with st.chat_message(
-            "assistant"
-        ):
-
-            with st.spinner(
-                "Thinking..."
-            ):
-
-                try:
-
-                    (
-                        answer,
-                        retrieved_chunks,
-                        metadata,
-                        ids,
-                        distances
-                    ) = ask_question(
-                        question,
-                        st.session_state.collection,
-                        st.session_state.explanation_mode
-                    )
-
-                    st.markdown(
-                        answer
-                    )
-
-                    # ------------------------------------------------
-                    # SOURCES
-                    # ------------------------------------------------
 
                     st.markdown(
                         "**Sources**"
                     )
 
                     for i in range(
-                        len(retrieved_chunks)
+                        len(item["chunks"])
                     ):
 
-                        page = metadata[i].get(
+                        page = item[
+                            "metadata"
+                        ][i].get(
                             "page",
                             "Unknown"
                         )
 
-                        distance = distances[i]
+                        distance = item[
+                            "distances"
+                        ][i]
 
                         with st.expander(
                             f"Page {page} · Source {i + 1}"
                         ):
 
                             st.write(
-                                retrieved_chunks[i]
+                                item["chunks"][i]
                             )
 
                             st.caption(
-                                f"Relevance distance: {distance:.4f}"
+                                f"Relevance distance: "
+                                f"{distance:.4f}"
                             )
 
-                    # ------------------------------------------------
-                    # SAVE HISTORY
-                    # ------------------------------------------------
+            st.divider()
 
-                    st.session_state.history.append(
-                        {
-                            "question": question,
-                            "answer": answer,
-                            "chunks": retrieved_chunks,
-                            "metadata": metadata,
-                            "ids": ids,
-                            "distances": distances
-                        }
-                    )
+    else:
 
-                except Exception as e:
+        # ----------------------------------------------------
+        # EMPTY CONVERSATION
+        # ----------------------------------------------------
 
-                    st.error(
-                        f"Unable to answer the question: {e}"
-                    )
+        st.subheader(
+            "Ask questions about your paper"
+        )
+
+        st.write(
+            "You can ask about the methodology, "
+            "dataset, algorithms, results, limitations, "
+            "or any other information contained in the paper."
+        )
+
+        st.write("")
+
+        example_col1, example_col2 = st.columns(2)
+
+        with example_col1:
+
+            st.info(
+                "What methodology is used in this paper?"
+            )
+
+            st.info(
+                "What dataset was used?"
+            )
+
+        with example_col2:
+
+            st.info(
+                "What are the main results?"
+            )
+
+            st.info(
+                "What are the limitations?"
+            )
+
+
+# ============================================================
+# CHAT INPUT
+# ============================================================
+
+if st.session_state.collection is not None:
+
+    question = st.chat_input(
+        "Ask anything about this research paper..."
+    )
+
+    if question:
+
+        with st.spinner(
+            "Finding the relevant information..."
+        ):
+
+            try:
+
+                (
+                    answer,
+                    retrieved_chunks,
+                    metadata,
+                    ids,
+                    distances
+                ) = ask_question(
+                    question,
+                    st.session_state.collection,
+                    st.session_state.explanation_mode
+                )
+
+                st.session_state.history.append(
+                    {
+                        "question": question,
+                        "answer": answer,
+                        "chunks": retrieved_chunks,
+                        "metadata": metadata,
+                        "ids": ids,
+                        "distances": distances
+                    }
+                )
+
+                st.rerun()
+
+            except Exception as e:
+
+                st.error(
+                    f"Unable to answer the question: {e}"
+                )
