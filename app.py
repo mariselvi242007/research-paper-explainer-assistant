@@ -52,33 +52,31 @@ st.markdown(
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap');
 
 .stApp {font-family: 'Public Sans', system-ui, sans-serif;}
-footer {display: none;}
+footer, #MainMenu {display: none;}
 header[data-testid="stHeader"] {background: transparent;}
+[data-testid="stToolbar"], [data-testid="stAppDeployButton"], [data-testid="stDecoration"],
+[data-testid="stStatusWidget"] {display: none !important;}
 
 /* Centered reading column for the chat */
 .block-container {max-width: 880px; padding-top: 2rem; padding-bottom: 6rem;}
 
 /* ---------- Sidebar ---------- */
-.pl-logo {display: flex; align-items: center; gap: .6rem; margin: .1rem 0 .9rem 0;}
-.pl-logo-mark {
-    width: 32px; height: 32px; border-radius: 9px; background: #2F5D8A; color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font: 700 1rem 'Newsreader', Georgia, serif;
-}
-.pl-logo-name {font: 600 1.2rem 'Newsreader', Georgia, serif; line-height: 1.1;}
-.pl-section {font-size: .78rem; font-weight: 600; opacity: .6; margin: 1.1rem 0 .35rem .1rem;}
+.pl-logo-name {font: 600 1.45rem 'Newsreader', Georgia, serif; line-height: 1.1; margin: .1rem 0 1rem 0;}
+.pl-section {font-size: .78rem; font-weight: 600; opacity: .6; margin: 1.2rem 0 .4rem .1rem;}
 .pl-hint {font-size: .82rem; opacity: .7; margin-top: .35rem;}
 
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {
-    background: transparent; border: 1px solid transparent;
-    justify-content: flex-start; text-align: left; border-radius: 9px;
+/* Recent chats: flat rows, title + small subtitle, accent bar on the open chat */
+[data-testid="stSidebar"] [class*="st-key-recent_"] button,
+[data-testid="stSidebar"] [class*="st-key-pinned_"] button {
+    background: transparent; border: none; border-radius: 8px;
+    justify-content: flex-start; text-align: left; font-weight: 500;
+    padding: .5rem .75rem; min-height: 0; box-shadow: none;
 }
-[data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {
-    background: rgba(47,93,138,.08); border-color: rgba(47,93,138,.15);
-}
-[data-testid="stSidebar"] [data-testid="stBaseButton-primary"] {
-    background: #E1ECF7; color: #1B2430; border: 1px solid #B9D0E8;
-    justify-content: flex-start; text-align: left; border-radius: 9px;
+[data-testid="stSidebar"] [class*="st-key-recent_"] button:hover,
+[data-testid="stSidebar"] [class*="st-key-pinned_"] button:hover {background: rgba(47,93,138,.08);}
+[data-testid="stSidebar"] [class*="st-key-recent_"] [data-testid="stBaseButton-primary"],
+[data-testid="stSidebar"] [class*="st-key-pinned_"] [data-testid="stBaseButton-primary"] {
+    background: #E6EEF7; color: #1B2430; box-shadow: inset 3px 0 0 #2F5D8A;
 }
 .st-key-new_chat_btn button {
     background: #2F5D8A !important; color: #fff !important; border: none !important;
@@ -91,7 +89,20 @@ header[data-testid="stHeader"] {background: transparent;}
 .pl-meta {color: #66758a; font-size: .85rem; margin: .2rem 0 .8rem 0;}
 
 /* ---------- Chat ---------- */
-[data-testid="stChatMessage"] {border-radius: 14px; padding: .75rem 1rem;}
+[data-testid="stChatMessageAvatarUser"], [data-testid="stChatMessageAvatarAssistant"] {display: none;}
+[data-testid="stChatMessage"] {
+    width: fit-content; max-width: 88%; border-radius: 16px; padding: .8rem 1.1rem;
+    background: #F4F7FA; border: 1px solid #E3E9F0; margin-right: auto;
+}
+/* Questions: right side */
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
+    margin-left: auto; margin-right: 0; max-width: 72%;
+    background: #E1ECF7; border-color: #C9DCEF; border-bottom-right-radius: 4px;
+}
+/* Answers: left side */
+[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
+    border-bottom-left-radius: 4px; background: #FFFFFF; border-color: #DDE5EE;
+}
 .pl-cites {color: #66758a; font-size: .82rem; margin-top: .4rem;}
 .pl-empty {text-align: center; padding: 3rem 1rem 1rem 1rem;}
 .pl-empty b {font: 600 1.5rem 'Newsreader', Georgia, serif;}
@@ -374,9 +385,10 @@ Retrieved paper content:
 # ============================================================
 
 def chat_button(chat_id, prefix):
-    title = st.session_state.chats[chat_id]["title"]
-    if len(title) > 34:
-        title = title[:31] + "..."
+    chat = st.session_state.chats[chat_id]
+    title = chat["title"]
+    if len(title) > 32:
+        title = title[:29] + "..."
 
     is_current = chat_id == st.session_state.current_chat_id
 
@@ -385,17 +397,14 @@ def chat_button(chat_id, prefix):
         key=f"{prefix}_{chat_id}",
         use_container_width=True,
         type="primary" if is_current else "secondary",
+        help=f"{chat['paper_name']} · {len(chat['history'])} messages",
     ):
         open_chat(chat_id)
         st.rerun()
 
 
 with st.sidebar:
-    st.markdown(
-        '<div class="pl-logo"><div class="pl-logo-mark">P</div>'
-        '<div class="pl-logo-name">PaperLens</div></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="pl-logo-name">PaperLens</div>', unsafe_allow_html=True)
 
     # Answer style, at the top
     st.markdown('<div class="pl-section">Answer style</div>', unsafe_allow_html=True)
@@ -422,16 +431,33 @@ with st.sidebar:
 
     # Recents / history
     st.markdown('<div class="pl-section">Recents</div>', unsafe_allow_html=True)
+
     recent_ids = [
         c
         for c in st.session_state.recents
         if c in st.session_state.chats and c not in st.session_state.pinned
     ]
+
+    if len(recent_ids) > 4:
+        search = st.text_input(
+            "Search chats",
+            placeholder="Search chats",
+            label_visibility="collapsed",
+            key="chat_search",
+        ).strip().lower()
+        if search:
+            recent_ids = [
+                c
+                for c in recent_ids
+                if search in st.session_state.chats[c]["title"].lower()
+                or search in st.session_state.chats[c]["paper_name"].lower()
+            ]
+
     if recent_ids:
         for chat_id in recent_ids:
             chat_button(chat_id, "recent")
     else:
-        st.caption("Your chats will appear here.")
+        st.caption("No chats yet. Upload a paper to begin.")
 
     # Options for the open chat
     current = get_current_chat()
