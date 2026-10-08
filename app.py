@@ -25,8 +25,6 @@ st.set_page_config(
 MODEL_NAME = "gemini-3-flash-preview"
 MODES = ["Simple", "Technical"]
 
-# Link shown in the Share menu. Change it if your app address changes.
-APP_URL = "https://research-paper-explainer-assistant-pfo2wmn82f9rb3guf8tcv3.streamlit.app"
 
 MODE_HINTS = {
     "Simple": "Plain, beginner-friendly answers.",
@@ -64,8 +62,8 @@ header[data-testid="stHeader"] {background: transparent;}
 .block-container {max-width: 880px; padding-top: 2rem; padding-bottom: 6rem;}
 
 /* ---------- Sidebar ---------- */
-.pl-logo-name {font: 600 1.45rem 'Newsreader', Georgia, serif; line-height: 1.1; margin: .1rem 0 1rem 0;}
-.pl-section {font-size: .78rem; font-weight: 600; opacity: .6; margin: 1.2rem 0 .4rem .1rem;}
+.pl-logo-name {font: 600 1.45rem 'Newsreader', Georgia, serif; line-height: 1.1; margin: 0 0 .3rem 0;}
+.pl-section {font-size: .78rem; font-weight: 600; opacity: .6; margin: .7rem 0 .1rem .1rem;}
 .pl-hint {font-size: .82rem; opacity: .7; margin-top: .35rem;}
 
 /* Recent chats: flat rows, title + small subtitle, accent bar on the open chat */
@@ -86,6 +84,29 @@ header[data-testid="stHeader"] {background: transparent;}
     justify-content: center !important; font-weight: 600; border-radius: 9px;
 }
 .st-key-new_chat_btn button:hover {background: #254B72 !important;}
+
+
+/* ---------- Sidebar spacing ---------- */
+[data-testid="stSidebarHeader"] {height: auto; padding: .6rem 1rem 0 1rem;}
+[data-testid="stSidebarUserContent"] {padding-top: .3rem;}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap: .4rem;}
+
+/* Left-align text inside sidebar buttons */
+[data-testid="stSidebar"] .stButton button > div,
+[data-testid="stSidebar"] [data-testid="stPopover"] button > div {justify-content: flex-start; width: 100%;}
+[data-testid="stSidebar"] .stButton button p {text-align: left;}
+.st-key-new_chat_btn button > div {justify-content: center !important;}
+
+/* Chat actions: flat rows */
+[class*="st-key-act_"] button,
+[data-testid="stSidebar"] [data-testid="stPopover"] button {
+    background: transparent; border: none; box-shadow: none; border-radius: 8px;
+    padding: .4rem .75rem; min-height: 0; font-weight: 500; justify-content: flex-start;
+}
+[class*="st-key-act_"] button:hover {background: rgba(47,93,138,.08);}
+[data-testid="stSidebar"] [data-testid="stPopover"] button {color: #B3382C;}
+[data-testid="stSidebar"] [data-testid="stPopover"] button:hover {background: rgba(179,56,44,.08);}
+.st-key-act_delete_confirm button {background: #B3382C !important; color: #fff !important; justify-content: center !important;}
 
 /* ---------- Header ---------- */
 .pl-title {font: 600 1.55rem 'Newsreader', Georgia, serif; margin: 0; line-height: 1.25;}
@@ -291,34 +312,17 @@ def delete_chat(chat_id):
         new_chat()
 
 
+def clear_chat(chat_id):
+    chat = st.session_state.chats.get(chat_id)
+    if chat:
+        chat["history"] = []
+
+
 def toggle_pin(chat_id):
     if chat_id in st.session_state.pinned:
         st.session_state.pinned.remove(chat_id)
     else:
         st.session_state.pinned.insert(0, chat_id)
-
-
-def build_transcript(chat):
-    """Plain Markdown version of a conversation for Export and Share."""
-    lines = [f"# {chat['paper_name']}", ""]
-
-    for item in chat["history"]:
-        lines.append(f"**Question:** {item['question']}")
-        lines.append("")
-        lines.append(f"**Answer:** {item['answer']}")
-
-        pages_cited = sorted(
-            {m.get("page") for m in item.get("metadata", []) if m.get("page")}
-        )
-        if pages_cited:
-            lines.append("")
-            lines.append("Pages: " + ", ".join(str(p) for p in pages_cited))
-
-        lines.append("")
-        lines.append("---")
-        lines.append("")
-
-    return "\n".join(lines)
 
 
 def ask_suggestion(question):
@@ -488,22 +492,37 @@ with st.sidebar:
     # Options for the open chat
     current = get_current_chat()
     if current:
-        st.markdown('<div class="pl-section">This chat</div>', unsafe_allow_html=True)
-        c1, c2, c3 = st.columns(3)
+        st.markdown('<div class="pl-section">Chat actions</div>', unsafe_allow_html=True)
 
-        with c1:
-            is_pinned = current["id"] in st.session_state.pinned
-            if st.button("Unpin" if is_pinned else "Pin", use_container_width=True):
-                toggle_pin(current["id"])
-                st.rerun()
+        is_pinned = current["id"] in st.session_state.pinned
 
-        with c2:
-            if st.button("Clear", use_container_width=True):
-                current["history"] = []
-                st.rerun()
+        st.button(
+            "Summarize paper",
+            key="act_summary",
+            icon=":material/summarize:",
+            on_click=ask_summary,
+            use_container_width=True,
+        )
+        st.button(
+            "Unpin chat" if is_pinned else "Pin chat",
+            key="act_pin",
+            icon=":material/push_pin:",
+            on_click=toggle_pin,
+            args=(current["id"],),
+            use_container_width=True,
+        )
+        st.button(
+            "Clear messages",
+            key="act_clear",
+            icon=":material/ink_eraser:",
+            on_click=clear_chat,
+            args=(current["id"],),
+            use_container_width=True,
+        )
 
-        with c3:
-            if st.button("Delete", use_container_width=True):
+        with st.popover("Delete chat", icon=":material/delete:", use_container_width=True):
+            st.caption("This removes the chat and its messages.")
+            if st.button("Yes, delete", key="act_delete_confirm", type="primary", use_container_width=True):
                 delete_chat(current["id"])
                 st.rerun()
 
@@ -561,62 +580,7 @@ else:
         unsafe_allow_html=True,
     )
 
-    share_col, export_col, pin_col, summary_col = st.columns(4)
 
-    with share_col:
-        with st.popover("Share", icon=":material/share:", use_container_width=True):
-            st.markdown("**Share this app**")
-            st.code(APP_URL, language=None)
-            st.caption("Anyone with the link can upload their own paper.")
-
-            st.markdown("**Share this conversation**")
-            st.download_button(
-                "Download as Markdown",
-                data=build_transcript(current_chat),
-                file_name=f"{current_chat['paper_name'].rsplit('.', 1)[0]}_chat.md",
-                mime="text/markdown",
-                icon=":material/description:",
-                use_container_width=True,
-                disabled=not history,
-                key="share_download",
-            )
-
-    with export_col:
-        st.download_button(
-            "Export",
-            data=build_transcript(current_chat),
-            file_name=f"{current_chat['paper_name'].rsplit('.', 1)[0]}_chat.md",
-            mime="text/markdown",
-            icon=":material/download:",
-            use_container_width=True,
-            disabled=not history,
-            help="Download this conversation",
-            key="export_download",
-        )
-
-    with pin_col:
-        is_pinned = current_chat["id"] in st.session_state.pinned
-        st.button(
-            "Unpin" if is_pinned else "Pin",
-            key="top_pin",
-            on_click=toggle_pin,
-            args=(current_chat["id"],),
-            icon=":material/push_pin:",
-            use_container_width=True,
-            help="Keep this chat at the top of the sidebar",
-        )
-
-    with summary_col:
-        st.button(
-            "Summary",
-            key="top_summary",
-            on_click=ask_summary,
-            icon=":material/summarize:",
-            use_container_width=True,
-            help="Summarize the whole paper",
-        )
-
-    st.write("")
 
     # ---------------- Empty state ----------------
 
