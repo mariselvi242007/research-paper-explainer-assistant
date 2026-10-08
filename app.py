@@ -25,6 +25,9 @@ st.set_page_config(
 MODEL_NAME = "gemini-3-flash-preview"
 MODES = ["Simple", "Technical"]
 
+# Link shown in the Share menu. Change it if your app address changes.
+APP_URL = "https://research-paper-explainer-assistant-pfo2wmn82f9rb3guf8tcv3.streamlit.app"
+
 MODE_HINTS = {
     "Simple": "Plain, beginner-friendly answers.",
     "Technical": "Detailed answers with research terminology.",
@@ -295,6 +298,29 @@ def toggle_pin(chat_id):
         st.session_state.pinned.insert(0, chat_id)
 
 
+def build_transcript(chat):
+    """Plain Markdown version of a conversation for Export and Share."""
+    lines = [f"# {chat['paper_name']}", ""]
+
+    for item in chat["history"]:
+        lines.append(f"**Question:** {item['question']}")
+        lines.append("")
+        lines.append(f"**Answer:** {item['answer']}")
+
+        pages_cited = sorted(
+            {m.get("page") for m in item.get("metadata", []) if m.get("page")}
+        )
+        if pages_cited:
+            lines.append("")
+            lines.append("Pages: " + ", ".join(str(p) for p in pages_cited))
+
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def ask_suggestion(question):
     st.session_state.pending = {"kind": "question", "question": question}
 
@@ -528,22 +554,69 @@ else:
 
     # ---------------- Header ----------------
 
-    title_col, action_col = st.columns([4, 1])
+    total_words = sum(len(p["text"].split()) for p in pages)
+    st.markdown(
+        f'<p class="pl-title">{html.escape(current_chat["paper_name"])}</p>'
+        f'<p class="pl-meta">{len(pages)} pages · {total_words:,} words · {mode} answers</p>',
+        unsafe_allow_html=True,
+    )
 
-    with title_col:
-        total_words = sum(len(p["text"].split()) for p in pages)
-        st.markdown(
-            f'<p class="pl-title">{html.escape(current_chat["paper_name"])}</p>'
-            f'<p class="pl-meta">{len(pages)} pages · {total_words:,} words · {mode} answers</p>',
-            unsafe_allow_html=True,
-        )
+    share_col, export_col, pin_col, summary_col = st.columns(4)
 
-    with action_col:
-        st.button(
-            "Summarize paper",
-            on_click=ask_summary,
+    with share_col:
+        with st.popover("Share", icon=":material/share:", use_container_width=True):
+            st.markdown("**Share this app**")
+            st.code(APP_URL, language=None)
+            st.caption("Anyone with the link can upload their own paper.")
+
+            st.markdown("**Share this conversation**")
+            st.download_button(
+                "Download as Markdown",
+                data=build_transcript(current_chat),
+                file_name=f"{current_chat['paper_name'].rsplit('.', 1)[0]}_chat.md",
+                mime="text/markdown",
+                icon=":material/description:",
+                use_container_width=True,
+                disabled=not history,
+                key="share_download",
+            )
+
+    with export_col:
+        st.download_button(
+            "Export",
+            data=build_transcript(current_chat),
+            file_name=f"{current_chat['paper_name'].rsplit('.', 1)[0]}_chat.md",
+            mime="text/markdown",
+            icon=":material/download:",
             use_container_width=True,
+            disabled=not history,
+            help="Download this conversation",
+            key="export_download",
         )
+
+    with pin_col:
+        is_pinned = current_chat["id"] in st.session_state.pinned
+        st.button(
+            "Unpin" if is_pinned else "Pin",
+            key="top_pin",
+            on_click=toggle_pin,
+            args=(current_chat["id"],),
+            icon=":material/push_pin:",
+            use_container_width=True,
+            help="Keep this chat at the top of the sidebar",
+        )
+
+    with summary_col:
+        st.button(
+            "Summary",
+            key="top_summary",
+            on_click=ask_summary,
+            icon=":material/summarize:",
+            use_container_width=True,
+            help="Summarize the whole paper",
+        )
+
+    st.write("")
 
     # ---------------- Empty state ----------------
 
@@ -616,10 +689,6 @@ else:
                         answer, chunks, metadata, distances = ask_question(
                             pending["question"], collection, mode
                         )
-
-                    # The first question becomes the chat's title in Recents
-                    if not history and pending["kind"] == "question":
-                        current_chat["title"] = pending["question"]
 
                     history.append(
                         {
