@@ -22,7 +22,11 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-MODEL_NAME = "gemini-3-flash-preview"
+PRIMARY_MODEL = "gemini-3-flash-preview"
+
+# If the main model hits its daily free quota, the next one is tried automatically.
+# (Gemini free-tier quotas are counted separately for each model.)
+FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
 MODES = ["Simple", "Technical"]
 
 
@@ -63,8 +67,6 @@ header[data-testid="stHeader"] {background: transparent;}
 
 /* ---------- Sidebar ---------- */
 .pl-logo-name {font: 600 1.45rem 'Newsreader', Georgia, serif; line-height: 1.1; margin: 0 0 .3rem 0;}
-.pl-section {font-size: .78rem; font-weight: 600; opacity: .6; margin: .7rem 0 .1rem .1rem;}
-.pl-hint {font-size: .82rem; opacity: .7; margin-top: .35rem;}
 
 /* Recent chats: flat rows, title + small subtitle, accent bar on the open chat */
 [data-testid="stSidebar"] [class*="st-key-recent_"] button,
@@ -89,24 +91,25 @@ header[data-testid="stHeader"] {background: transparent;}
 /* ---------- Sidebar spacing ---------- */
 [data-testid="stSidebarHeader"] {height: auto; padding: .6rem 1rem 0 1rem;}
 [data-testid="stSidebarUserContent"] {padding-top: .3rem;}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap: .4rem;}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap: .6rem;}
 
 /* Left-align text inside sidebar buttons */
-[data-testid="stSidebar"] .stButton button > div,
-[data-testid="stSidebar"] [data-testid="stPopover"] button > div {justify-content: flex-start; width: 100%;}
+[data-testid="stSidebar"] .stButton button > div {justify-content: flex-start; width: 100%;}
 [data-testid="stSidebar"] .stButton button p {text-align: left;}
 .st-key-new_chat_btn button > div {justify-content: center !important;}
 
 /* Chat actions: flat rows */
-[class*="st-key-act_"] button,
-[data-testid="stSidebar"] [data-testid="stPopover"] button {
+[class*="st-key-act_"] button {
     background: transparent; border: none; box-shadow: none; border-radius: 8px;
     padding: .4rem .75rem; min-height: 0; font-weight: 500; justify-content: flex-start;
 }
 [class*="st-key-act_"] button:hover {background: rgba(47,93,138,.08);}
-[data-testid="stSidebar"] [data-testid="stPopover"] button {color: #B3382C;}
-[data-testid="stSidebar"] [data-testid="stPopover"] button:hover {background: rgba(179,56,44,.08);}
-.st-key-act_delete_confirm button {background: #B3382C !important; color: #fff !important; justify-content: center !important;}
+.st-key-act_delete button, .st-key-act_delete_yes button {color: #B3382C;}
+.st-key-act_delete button:hover {background: rgba(179,56,44,.08);}
+.st-key-act_delete_yes button, .st-key-act_delete_no button {
+    justify-content: center !important; border: 1px solid #D5DDE6 !important;
+}
+.st-key-act_delete_yes button > div, .st-key-act_delete_no button > div {justify-content: center !important;}
 
 /* ---------- Header ---------- */
 .pl-title {font: 600 1.55rem 'Newsreader', Georgia, serif; margin: 0; line-height: 1.25;}
@@ -156,6 +159,7 @@ defaults = {
     "explanation_mode": "Simple",
     "upload_key": 0,
     "pending": None,
+    "confirm_delete": None,
 }
 
 for key, value in defaults.items():
@@ -312,6 +316,10 @@ def delete_chat(chat_id):
         new_chat()
 
 
+def set_confirm_delete(chat_id):
+    st.session_state.confirm_delete = chat_id
+
+
 def clear_chat(chat_id):
     chat = st.session_state.chats.get(chat_id)
     if chat:
@@ -336,6 +344,62 @@ def ask_summary():
 # ============================================================
 # AI FUNCTIONS
 # ============================================================
+
+class QuotaExceeded(Exception):
+    """Raised when every configured Gemini model has hit its quota."""
+
+
+def get_model_candidates():
+    try:
+        primary = st.secrets.get("GEMINI_MODEL", PRIMARY_MODEL)
+    except Exception:
+        primary = PRIMARY_MODEL
+
+    models = [primary] + [m for m in FALLBACK_MODELS if m != primary]
+    return models
+
+
+def generate_text(prompt):
+    """Call Gemini, moving to the next model if one is out of quota or unavailable."""
+    quota_hit = False
+    last_error = None
+
+    for model in get_model_candidates():
+        try:
+            response = client.models.generate_content(model=model, contents=prompt)
+            return response.text or "The model returned an empty answer. Please try again."
+        except Exception as e:
+            message = str(e)
+            last_error = e
+
+            if "429" in message or "RESOURCE_EXHAUSTED" in message:
+                quota_hit = True
+                continue
+
+            if any(code in message for code in ("404", "NOT_FOUND", "503", "UNAVAILABLE")):
+                continue
+
+            raise
+
+    if quota_hit:
+        raise QuotaExceeded()
+
+    raise last_error
+
+
+def friendly_error(error):
+    if isinstance(error, QuotaExceeded):
+        return (
+            "The Gemini API quota for today is used up on every model. "
+            "It resets at midnight Pacific time. To continue now, add billing to your "
+            "Google AI Studio project or use an API key from a different project."
+        )
+
+    text = str(error)
+    if len(text) > 300:
+        text = text[:300] + "..."
+    return f"Something went wrong while contacting the model: {text}"
+
 
 def generate_summary(pages):
     paper_text = "\n\n".join(
@@ -366,8 +430,7 @@ Not specified in the paper.
 Research paper:
 {paper_text}
 """
-    response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-    return response.text
+    return generate_text(prompt)
 
 
 def ask_question(question, collection, mode):
@@ -406,8 +469,7 @@ Retrieved paper content:
 {context}
 """
 
-    response = client.models.generate_content(model=MODEL_NAME, contents=prompt)
-    return response.text, chunks, metadata, distances
+    return generate_text(prompt), chunks, metadata, distances
 
 
 # ============================================================
@@ -437,7 +499,7 @@ with st.sidebar:
     st.markdown('<div class="pl-logo-name">PaperLens</div>', unsafe_allow_html=True)
 
     # Answer style, at the top
-    st.markdown('<div class="pl-section">Answer style</div>', unsafe_allow_html=True)
+    st.caption("Answer style")
     st.segmented_control(
         "Answer style",
         MODES,
@@ -445,9 +507,8 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     active_mode = st.session_state.explanation_mode or "Simple"
-    st.markdown(f'<div class="pl-hint">{MODE_HINTS[active_mode]}</div>', unsafe_allow_html=True)
+    st.caption(MODE_HINTS[active_mode])
 
-    st.write("")
     if st.button("New chat", key="new_chat_btn", use_container_width=True):
         new_chat()
         st.rerun()
@@ -455,12 +516,12 @@ with st.sidebar:
     # Pinned
     pinned_ids = [c for c in st.session_state.pinned if c in st.session_state.chats]
     if pinned_ids:
-        st.markdown('<div class="pl-section">Pinned</div>', unsafe_allow_html=True)
+        st.caption("Pinned")
         for chat_id in pinned_ids:
             chat_button(chat_id, "pinned")
 
     # Recents / history
-    st.markdown('<div class="pl-section">Recents</div>', unsafe_allow_html=True)
+    st.caption("Recents")
 
     recent_ids = [
         c
@@ -492,17 +553,10 @@ with st.sidebar:
     # Options for the open chat
     current = get_current_chat()
     if current:
-        st.markdown('<div class="pl-section">Chat actions</div>', unsafe_allow_html=True)
+        st.caption("Chat actions")
 
         is_pinned = current["id"] in st.session_state.pinned
 
-        st.button(
-            "Summarize paper",
-            key="act_summary",
-            icon=":material/summarize:",
-            on_click=ask_summary,
-            use_container_width=True,
-        )
         st.button(
             "Unpin chat" if is_pinned else "Pin chat",
             key="act_pin",
@@ -520,11 +574,33 @@ with st.sidebar:
             use_container_width=True,
         )
 
-        with st.popover("Delete chat", icon=":material/delete:", use_container_width=True):
-            st.caption("This removes the chat and its messages.")
-            if st.button("Yes, delete", key="act_delete_confirm", type="primary", use_container_width=True):
-                delete_chat(current["id"])
-                st.rerun()
+        if st.session_state.confirm_delete == current["id"]:
+            st.caption("Delete this chat and its messages?")
+            yes_col, no_col = st.columns(2)
+
+            with yes_col:
+                if st.button("Delete", key="act_delete_yes", use_container_width=True):
+                    st.session_state.confirm_delete = None
+                    delete_chat(current["id"])
+                    st.rerun()
+
+            with no_col:
+                st.button(
+                    "Cancel",
+                    key="act_delete_no",
+                    on_click=set_confirm_delete,
+                    args=(None,),
+                    use_container_width=True,
+                )
+        else:
+            st.button(
+                "Delete chat",
+                key="act_delete",
+                icon=":material/delete:",
+                on_click=set_confirm_delete,
+                args=(current["id"],),
+                use_container_width=True,
+            )
 
 
 # ============================================================
@@ -574,13 +650,22 @@ else:
     # ---------------- Header ----------------
 
     total_words = sum(len(p["text"].split()) for p in pages)
-    st.markdown(
-        f'<p class="pl-title">{html.escape(current_chat["paper_name"])}</p>'
-        f'<p class="pl-meta">{len(pages)} pages · {total_words:,} words · {mode} answers</p>',
-        unsafe_allow_html=True,
-    )
+    title_col, summary_col = st.columns([4, 1])
 
+    with title_col:
+        st.markdown(
+            f'<p class="pl-title">{html.escape(current_chat["paper_name"])}</p>'
+            f'<p class="pl-meta">{len(pages)} pages · {total_words:,} words · {mode} answers</p>',
+            unsafe_allow_html=True,
+        )
 
+    with summary_col:
+        st.button(
+            "Summarize paper",
+            key="top_summary",
+            on_click=ask_summary,
+            use_container_width=True,
+        )
 
     # ---------------- Empty state ----------------
 
@@ -670,7 +755,10 @@ else:
 
                 except Exception as e:
                     st.session_state.pending = None
-                    st.error(f"Unable to answer the question: {e}")
+                    if isinstance(e, QuotaExceeded):
+                        st.warning(friendly_error(e))
+                    else:
+                        st.error(friendly_error(e))
 
     # ---------------- Chat input ----------------
 
