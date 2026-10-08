@@ -1,0 +1,10 @@
+pypdf
+langchain
+langchain-community
+langchain-text-splitters
+chromadb
+sentence-transformers
+google-genai
+streamlit
+python-dotenv
+scikit-learn
