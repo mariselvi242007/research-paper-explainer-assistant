@@ -120,6 +120,20 @@ header[data-testid="stHeader"] {background: transparent;}
 }
 .st-key-act_delete_yes button > div, .st-key-act_delete_no button > div {justify-content: center !important;}
 
+/* ---------- Blue accent (replaces Streamlit's default red) ---------- */
+[data-testid="stBaseButton-segmented_controlActive"],
+[data-testid="stSegmentedControl"] button[aria-checked="true"],
+[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+    background: #2F5D8A !important; border-color: #2F5D8A !important; color: #fff !important;
+}
+[data-testid="stBaseButton-segmented_controlActive"] p,
+[data-testid="stBaseButton-segmented_controlActive"] span,
+[data-testid="stSegmentedControl"] button[aria-checked="true"] p,
+[data-testid="stSegmentedControl"] button[aria-pressed="true"] p {color: #fff !important;}
+[data-testid="stBaseButton-segmented_control"]:hover {border-color: #2F5D8A; color: #2F5D8A;}
+[data-testid="stChatInput"]:focus-within {border-color: #2F5D8A !important; box-shadow: 0 0 0 1px #2F5D8A;}
+[data-testid="stTextInput"] input:focus {border-color: #2F5D8A !important; box-shadow: 0 0 0 1px #2F5D8A !important;}
+
 /* ---------- Header ---------- */
 .pl-title {font: 600 1.55rem 'Newsreader', Georgia, serif; margin: 0; line-height: 1.25;}
 .pl-meta {color: #66758a; font-size: .85rem; margin: .2rem 0 .8rem 0;}
