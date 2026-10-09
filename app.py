@@ -1,3 +1,4 @@
+
 import html
 import re
 import uuid
@@ -63,7 +64,8 @@ STYLE_INSTRUCTIONS = {
 
 
 # ============================================================
-# CSS — PAPERLENS UI + BLUE CHAT INPUT AND SEND ICON
+# CSS — ORIGINAL PAPERLENS DESIGN
+# Only requested input/button/toolbar styling is changed.
 # ============================================================
 
 st.markdown(
@@ -82,6 +84,14 @@ st.markdown(
 
 footer, #MainMenu {
     display: none;
+}
+
+/* Hide the top share/star toolbar icons */
+[data-testid="stToolbar"],
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"] {
+    display: none !important;
+    visibility: hidden !important;
 }
 
 header[data-testid="stHeader"] {
@@ -226,70 +236,97 @@ header[data-testid="stHeader"] {
     text-align: center !important;
 }
 
-/* General focused text fields */
+/* Keep the existing general text-field styling */
 [data-testid="stTextInput"] input:focus {
     border-color: #2F5D8A !important;
     box-shadow: 0 0 0 1px #2F5D8A !important;
 }
 
 /* ========================================================
-   CHAT TYPING BAR — BLUE BORDER WHEN TYPING
+   CHAT TYPING BAR — NO BLUE OUTLINE
    ======================================================== */
 
-/* Keep the chat input visible */
 [data-testid="stChatInput"] {
     visibility: visible !important;
     opacity: 1 !important;
+    background: #FFFFFF !important;
+    border: 1px solid #D5DDE6 !important;
+    border-radius: 18px !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
-/* Change the chat input border to blue on focus */
+/* Keep the border neutral while typing */
+[data-testid="stChatInput"]:focus,
 [data-testid="stChatInput"]:focus-within {
-    border-color: #2F5D8A !important;
-    box-shadow: 0 0 0 1px #2F5D8A !important;
+    border: 1px solid #D5DDE6 !important;
+    box-shadow: none !important;
+    outline: none !important;
 }
 
-/* Streamlit versions may use a form or textarea container */
+/* No outline or glow on the typing area */
 [data-testid="stChatInput"] [data-baseweb="textarea"],
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] [data-baseweb="base-input"] {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
     caret-color: #2F5D8A !important;
 }
 
-/* Blue send button */
-[data-testid="stChatInput"] button {
-    color: #2F5D8A !important;
-    background-color: transparent !important;
-    border-color: transparent !important;
+[data-testid="stChatInput"] textarea:focus,
+[data-testid="stChatInput"] textarea:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+}
+
+/* ========================================================
+   BLUE CIRCULAR SEND BUTTON
+   ======================================================== */
+
+[data-testid="stChatInputSubmitButton"] {
+    background-color: #2F5D8A !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    padding: 0 !important;
+    margin: 0 4px !important;
+    box-shadow: none !important;
+    outline: none !important;
     opacity: 1 !important;
     visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
-/* Blue send icon, including SVG-based icons */
-[data-testid="stChatInput"] button svg,
-[data-testid="stChatInput"] button svg path,
-[data-testid="stChatInput"] button svg line,
-[data-testid="stChatInput"] button svg polyline {
-    color: #2F5D8A !important;
-    stroke: #2F5D8A !important;
-}
-
-/* Hover effect */
-[data-testid="stChatInput"] button:hover {
-    background-color: #E1ECF7 !important;
-    color: #2F5D8A !important;
-    border-radius: 8px;
-}
-
-/* Also target Streamlit's form-submit button if the DOM differs */
-[data-testid="stChatInputSubmitButton"] {
-    color: #2F5D8A !important;
-    background-color: transparent !important;
-}
-
+/* White arrow */
 [data-testid="stChatInputSubmitButton"] svg,
-[data-testid="stChatInputSubmitButton"] svg path {
-    color: #2F5D8A !important;
-    stroke: #2F5D8A !important;
+[data-testid="stChatInputSubmitButton"] svg path,
+[data-testid="stChatInputSubmitButton"] svg line,
+[data-testid="stChatInputSubmitButton"] svg polyline {
+    color: #FFFFFF !important;
+    stroke: #FFFFFF !important;
+}
+
+/* Darker blue on hover */
+[data-testid="stChatInputSubmitButton"]:hover {
+    background-color: #254B72 !important;
+}
+
+/* No focus ring around the send button */
+[data-testid="stChatInputSubmitButton"]:focus,
+[data-testid="stChatInputSubmitButton"]:focus-visible,
+[data-testid="stChatInputSubmitButton"]:active {
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
 }
 
 /* Paper title */
@@ -1356,7 +1393,7 @@ else:
                     else:
                         st.error(friendly_error(e))
 
-    # Standard Streamlit input — keeps the send arrow
+    # Standard Streamlit chat input
     question = st.chat_input(
         "Ask about this paper...",
         key="paperlens_chat_input",
