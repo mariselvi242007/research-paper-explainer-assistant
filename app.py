@@ -286,24 +286,17 @@ header[data-testid="stHeader"] {
    BLUE CIRCULAR SEND BUTTON
    ======================================================== */
 
-[data-testid="stChatInputSubmitButton"] {
-    background-color: #2F5D8A !important;
-    color: #FFFFFF !important;
+[data-testid="stChatInputSubmitButton"] svg {
+    background: transparent !important;
     border: none !important;
-    border-radius: 50% !important;
-    width: 38px !important;
-    height: 38px !important;
-    min-width: 38px !important;
-    min-height: 38px !important;
-    padding: 0 !important;
-    margin: 0 4px !important;
     box-shadow: none !important;
-    outline: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+}
+
+[data-testid="stChatInputSubmitButton"] span,
+[data-testid="stChatInputSubmitButton"] div {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* White arrow */
