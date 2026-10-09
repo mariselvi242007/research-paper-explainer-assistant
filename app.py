@@ -33,7 +33,6 @@ FALLBACK_MODELS = [
     "gemini-2.5-flash-lite",
 ]
 
-# Groq models are attempted in this order.
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
@@ -61,8 +60,7 @@ STYLE_INSTRUCTIONS = {
 
 
 # ============================================================
-# STYLING
-# UI DESIGN PRESERVED
+# STYLING — ORIGINAL DESIGN PRESERVED
 # ============================================================
 
 st.markdown(
@@ -70,19 +68,11 @@ st.markdown(
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap');
 
-.stApp {
-    font-family: 'Public Sans', system-ui, sans-serif;
-}
+.stApp {font-family: 'Public Sans', system-ui, sans-serif;}
+footer, #MainMenu {display: none;}
+header[data-testid="stHeader"] {background: transparent;}
 
-footer, #MainMenu {
-    display: none;
-}
-
-header[data-testid="stHeader"] {
-    background: transparent;
-}
-
-/* Keep the sidebar open/close controls visible */
+/* Preserve the sidebar reopen/collapse controls */
 [data-testid="stToolbarActions"],
 [data-testid="stMainMenu"],
 [data-testid="stAppDeployButton"],
@@ -98,7 +88,7 @@ header[data-testid="stHeader"] {
     visibility: visible !important;
 }
 
-/* Centered reading column for chat */
+/* Centered chat */
 .block-container {
     max-width: 880px;
     padding-top: 2rem;
@@ -112,7 +102,6 @@ header[data-testid="stHeader"] {
     margin: 0 0 .3rem 0;
 }
 
-/* Recent chats */
 [data-testid="stSidebar"] [class*="st-key-recent_"] button,
 [data-testid="stSidebar"] [class*="st-key-pinned_"] button {
     background: transparent;
@@ -151,7 +140,6 @@ header[data-testid="stHeader"] {
     background: #254B72 !important;
 }
 
-/* Sidebar spacing */
 [data-testid="stSidebarHeader"] {
     height: auto;
     padding: .6rem 1rem 0 1rem;
@@ -165,7 +153,6 @@ header[data-testid="stHeader"] {
     gap: .6rem;
 }
 
-/* Left-align text inside sidebar buttons */
 [data-testid="stSidebar"] .stButton button > div {
     justify-content: flex-start;
     width: 100%;
@@ -179,7 +166,6 @@ header[data-testid="stHeader"] {
     justify-content: center !important;
 }
 
-/* Chat actions */
 [class*="st-key-act_"] button {
     background: transparent;
     border: none;
@@ -215,7 +201,7 @@ header[data-testid="stHeader"] {
     justify-content: center !important;
 }
 
-/* Answer style buttons */
+/* Answer modes */
 [class*="st-key-mode_"] [data-testid="stBaseButton-primary"] {
     background: #2F5D8A !important;
     border: 1px solid #2F5D8A !important;
@@ -245,7 +231,7 @@ header[data-testid="stHeader"] {
     text-align: center !important;
 }
 
-/* Blue accent */
+/* Blue accents */
 [data-testid="stBaseButton-segmented_controlActive"],
 [data-testid="stSegmentedControl"] button[aria-checked="true"],
 [data-testid="stSegmentedControl"] button[aria-pressed="true"] {
@@ -289,7 +275,7 @@ header[data-testid="stHeader"] {
     margin: .2rem 0 .8rem 0;
 }
 
-/* Chat */
+/* Chat messages */
 [data-testid="stChatMessageAvatarUser"],
 [data-testid="stChatMessageAvatarAssistant"] {
     display: none;
@@ -305,7 +291,6 @@ header[data-testid="stHeader"] {
     margin-right: auto;
 }
 
-/* User messages */
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
     margin-left: auto;
     margin-right: 0;
@@ -315,7 +300,6 @@ header[data-testid="stHeader"] {
     border-bottom-right-radius: 4px;
 }
 
-/* Assistant messages */
 [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
     border-bottom-left-radius: 4px;
     background: #FFFFFF;
@@ -362,6 +346,17 @@ header[data-testid="stHeader"] {
     padding: 2rem 1.2rem;
     background: #F7FAFD;
 }
+
+/* Keep the standard chat input and send arrow visible */
+[data-testid="stChatInput"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+[data-testid="stChatInput"] button {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
 </style>
 """,
     unsafe_allow_html=True,
@@ -381,6 +376,7 @@ defaults = {
     "upload_key": 0,
     "pending": None,
     "confirm_delete": None,
+    "processed_upload_signature": None,
 }
 
 for key, value in defaults.items():
@@ -389,8 +385,7 @@ for key, value in defaults.items():
 
 
 # ============================================================
-# API KEYS AND AI CLIENTS
-# GROQ FIRST, GEMINI FALLBACK
+# AI CLIENTS
 # ============================================================
 
 def get_secret(name, default=""):
@@ -410,24 +405,24 @@ if GROQ_API_KEY:
     try:
         groq_client = Groq(api_key=GROQ_API_KEY)
     except Exception as e:
-        st.warning(f"Unable to initialize Groq: {e}")
+        st.warning(f"Groq initialization failed: {e}")
 
 if GEMINI_API_KEY:
     try:
         gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     except Exception as e:
-        st.warning(f"Unable to initialize Gemini: {e}")
+        st.warning(f"Gemini initialization failed: {e}")
 
 if groq_client is None and gemini_client is None:
     st.error(
         "No AI provider is configured. Add GROQ_API_KEY or "
-        "GEMINI_API_KEY to your Streamlit Secrets."
+        "GEMINI_API_KEY to Streamlit Secrets."
     )
     st.stop()
 
 
 # ============================================================
-# EMBEDDING AND VECTOR DATABASE
+# EMBEDDINGS AND CHROMA
 # ============================================================
 
 @st.cache_resource
@@ -474,9 +469,7 @@ def create_chunks(pages):
     page_numbers = []
 
     for page_data in pages:
-        page_chunks = splitter.split_text(page_data["text"])
-
-        for chunk in page_chunks:
+        for chunk in splitter.split_text(page_data["text"]):
             chunks.append(chunk)
             page_numbers.append(page_data["page"])
 
@@ -493,8 +486,8 @@ def process_pdf(file_bytes):
 
     if not pages:
         raise ValueError(
-            "No readable text was found in this PDF. "
-            "The PDF may contain scanned images instead of selectable text."
+            "No readable text was found in the PDF. "
+            "Scanned PDFs may need OCR."
         )
 
     chunks, page_numbers = create_chunks(pages)
@@ -550,11 +543,7 @@ def create_chat(paper_name, collection, pages):
 
 def get_current_chat():
     chat_id = st.session_state.current_chat_id
-
-    if chat_id:
-        return st.session_state.chats.get(chat_id)
-
-    return None
+    return st.session_state.chats.get(chat_id) if chat_id else None
 
 
 def move_to_top(chat_id):
@@ -565,17 +554,16 @@ def move_to_top(chat_id):
 
 
 def open_chat(chat_id):
-    if chat_id not in st.session_state.chats:
-        return
-
-    st.session_state.current_chat_id = chat_id
-    st.session_state.pending = None
+    if chat_id in st.session_state.chats:
+        st.session_state.current_chat_id = chat_id
+        st.session_state.pending = None
 
 
 def new_chat():
     st.session_state.current_chat_id = None
     st.session_state.pending = None
     st.session_state.upload_key += 1
+    st.session_state.processed_upload_signature = None
 
 
 def delete_chat(chat_id):
@@ -628,28 +616,23 @@ def ask_summary():
 
 
 # ============================================================
-# AI FUNCTIONS
-# GROQ -> GEMINI -> GEMINI FALLBACK MODELS
+# AI PROVIDER FALLBACK
 # ============================================================
 
 class QuotaExceeded(Exception):
-    """Raised when configured models fail due to quota limits."""
-
     def __init__(
         self,
         quota_models,
         unavailable_models,
         retry_seconds=None,
     ):
-        super().__init__("AI model quota exceeded")
+        super().__init__("AI models reached their quota")
         self.quota_models = quota_models
         self.unavailable_models = unavailable_models
         self.retry_seconds = retry_seconds
 
 
 def parse_retry_seconds(message):
-    """Extract retry duration from provider error messages."""
-
     match = re.search(
         r"retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s",
         message,
@@ -677,7 +660,7 @@ def parse_retry_seconds(message):
     return None
 
 
-def get_model_candidates():
+def get_gemini_models():
     primary = get_secret("GEMINI_MODEL", PRIMARY_MODEL)
 
     return [primary] + [
@@ -686,11 +669,8 @@ def get_model_candidates():
     ]
 
 
-def get_groq_model_candidates():
-    primary = get_secret(
-        "GROQ_MODEL",
-        GROQ_MODELS[0],
-    )
+def get_groq_models():
+    primary = get_secret("GROQ_MODEL", GROQ_MODELS[0])
 
     return [primary] + [
         model for model in GROQ_MODELS
@@ -699,47 +679,39 @@ def get_groq_model_candidates():
 
 
 def is_quota_error(message):
-    lower_message = message.lower()
+    lower = message.lower()
 
     return (
         "429" in message
-        or "resource_exhausted" in lower_message
-        or "rate_limit_exceeded" in lower_message
-        or "rate limit" in lower_message
-        or "quota" in lower_message
+        or "resource_exhausted" in lower
+        or "rate_limit_exceeded" in lower
+        or "rate limit" in lower
+        or "quota" in lower
     )
 
 
 def is_unavailable_error(message):
-    lower_message = message.lower()
+    lower = message.lower()
 
     return (
-        any(code in message for code in ("404", "503"))
-        or "unavailable" in lower_message
-        or "model_not_found" in lower_message
-        or "model not found" in lower_message
-        or "decommissioned" in lower_message
+        "404" in message
+        or "503" in message
+        or "unavailable" in lower
+        or "model_not_found" in lower
+        or "model not found" in lower
+        or "decommissioned" in lower
     )
 
 
 def generate_text(prompt):
-    """
-    First try Groq.
-    If Groq models fail, try Gemini.
-    If the first Gemini model fails, try the remaining Gemini models.
-    """
-
     quota_models = []
     unavailable_models = []
     retry_delays = []
     other_errors = []
 
-    # --------------------------------------------------------
-    # 1. GROQ MODELS
-    # --------------------------------------------------------
-
+    # 1. Try Groq models first
     if groq_client is not None:
-        for model in get_groq_model_candidates():
+        for model in get_groq_models():
             try:
                 response = groq_client.chat.completions.create(
                     model=model,
@@ -748,8 +720,8 @@ def generate_text(prompt):
                             "role": "system",
                             "content": (
                                 "You are PaperLens, a research paper "
-                                "analysis assistant. Follow the prompt "
-                                "carefully and do not invent facts."
+                                "analysis assistant. Follow the supplied "
+                                "instructions and do not invent facts."
                             ),
                         },
                         {
@@ -766,7 +738,7 @@ def generate_text(prompt):
                     return answer.strip()
 
                 other_errors.append(
-                    f"Groq model {model} returned an empty answer."
+                    f"Groq {model}: empty response"
                 )
 
             except Exception as e:
@@ -776,7 +748,6 @@ def generate_text(prompt):
                     quota_models.append(f"Groq: {model}")
 
                     delay = parse_retry_seconds(message)
-
                     if delay is not None:
                         retry_delays.append(delay)
 
@@ -785,15 +756,12 @@ def generate_text(prompt):
 
                 else:
                     other_errors.append(
-                        f"Groq {model}: {message[:200]}"
+                        f"Groq {model}: {message[:180]}"
                     )
 
-    # --------------------------------------------------------
-    # 2. GEMINI MODELS
-    # --------------------------------------------------------
-
+    # 2. Try Gemini and its fallback models
     if gemini_client is not None:
-        for model in get_model_candidates():
+        for model in get_gemini_models():
             try:
                 response = gemini_client.models.generate_content(
                     model=model,
@@ -806,7 +774,7 @@ def generate_text(prompt):
                     return answer.strip()
 
                 other_errors.append(
-                    f"Gemini model {model} returned an empty answer."
+                    f"Gemini {model}: empty response"
                 )
 
             except Exception as e:
@@ -816,7 +784,6 @@ def generate_text(prompt):
                     quota_models.append(f"Gemini: {model}")
 
                     delay = parse_retry_seconds(message)
-
                     if delay is not None:
                         retry_delays.append(delay)
 
@@ -825,15 +792,10 @@ def generate_text(prompt):
 
                 else:
                     other_errors.append(
-                        f"Gemini {model}: {message[:200]}"
+                        f"Gemini {model}: {message[:180]}"
                     )
 
-    # --------------------------------------------------------
-    # 3. ALL PROVIDERS FAILED
-    # --------------------------------------------------------
-
-    # Report a quota error when every failure was a quota issue
-    # or a model-availability issue.
+    # 3. No provider succeeded
     if quota_models and not other_errors:
         raise QuotaExceeded(
             quota_models,
@@ -841,40 +803,29 @@ def generate_text(prompt):
             min(retry_delays) if retry_delays else None,
         )
 
-    if unavailable_models and not other_errors and not quota_models:
-        raise RuntimeError(
-            "All configured AI models are unavailable. "
-            "Check your model names and API provider settings."
-        )
-
     details = []
 
     if quota_models:
         details.append(
-            "Quota/rate-limit failures: "
-            + ", ".join(quota_models)
+            "Rate limits: " + ", ".join(quota_models)
         )
 
     if unavailable_models:
         details.append(
-            "Unavailable models: "
-            + ", ".join(unavailable_models)
+            "Unavailable models: " + ", ".join(unavailable_models)
         )
 
     if other_errors:
-        details.append(
-            "Other errors:\n" + "\n".join(other_errors[:4])
-        )
+        details.append("\n".join(other_errors[:4]))
 
     raise RuntimeError(
-        "Groq and Gemini could not generate an answer.\n"
+        "No configured AI model could answer the request.\n"
         + "\n".join(details)
     )
 
 
 def format_wait(seconds):
     seconds = int(round(seconds))
-
     hours, remainder = divmod(seconds, 3600)
     minutes = remainder // 60
 
@@ -900,31 +851,27 @@ def friendly_error(error):
     if isinstance(error, QuotaExceeded):
         seconds = error.retry_seconds
 
-        if seconds is None:
+        if seconds is not None and seconds < 3600:
             return (
-                "The configured AI models have reached their "
-                "request limits or are unavailable. Please try again "
-                "later, or check your Groq and Gemini quotas."
+                "AI request limit reached. Please try again in about "
+                f"{format_wait(seconds)}."
             )
 
-        if seconds < 3600:
-            return (
-                "The AI request limit has been reached. "
-                f"Please try again in about {format_wait(seconds)}."
+        if seconds is not None:
+            reset = datetime.now(timezone.utc) + timedelta(
+                seconds=seconds
             )
+            local = reset.astimezone(DISPLAY_TZ)
+            clock = local.strftime("%I:%M %p").lstrip("0")
 
-        reset = datetime.now(timezone.utc) + timedelta(
-            seconds=seconds
-        )
-
-        local = reset.astimezone(DISPLAY_TZ)
-        clock = local.strftime("%I:%M %p").lstrip("0")
-        day = f"{local.day} {local.strftime('%b')}"
+            return (
+                "AI request limit reached. Try again after "
+                f"{clock} IST on {local.day} {local.strftime('%b')}."
+            )
 
         return (
-            "The AI request limit has been reached. "
-            f"Please try again after {clock} IST on {day} "
-            f"(in about {format_wait(seconds)})."
+            "The configured AI models have reached their limits "
+            "or are unavailable. Check your API quotas and try again."
         )
 
     message = str(error)
@@ -932,14 +879,11 @@ def friendly_error(error):
     if len(message) > 500:
         message = message[:500] + "..."
 
-    return (
-        "Something went wrong while contacting the AI providers: "
-        + message
-    )
+    return f"Something went wrong: {message}"
 
 
 # ============================================================
-# PAPER SUMMARY
+# SUMMARY
 # ============================================================
 
 def generate_summary(pages):
@@ -954,8 +898,7 @@ You are a research paper analysis assistant.
 Analyze ONLY the research paper provided below.
 Do not use outside knowledge. Do not invent information.
 
-Write the answer in Markdown using EXACTLY these sections,
-each as a bold heading followed by 1 to 3 short sentences or bullets:
+Write the answer in Markdown using EXACTLY these sections:
 
 **Research objective**
 **Problem statement**
@@ -966,7 +909,9 @@ each as a bold heading followed by 1 to 3 short sentences or bullets:
 **Limitations**
 **Conclusion**
 
-If information is not available in the paper, write:
+Each heading should have 1 to 3 short sentences or bullets.
+
+If information is unavailable, write:
 Not specified in the paper.
 
 Research paper:
@@ -977,18 +922,16 @@ Research paper:
 
 
 # ============================================================
-# QUESTION ANSWERING WITH RETRIEVAL
+# QUESTION ANSWERING
 # ============================================================
 
 def ask_question(question, collection, mode):
-    query_embedding = embedding_model.encode([question])[0]
-
     count = collection.count()
 
     if count == 0:
-        raise ValueError(
-            "No indexed paper content was found. Please upload the PDF again."
-        )
+        raise ValueError("No paper content was indexed.")
+
+    query_embedding = embedding_model.encode([question])[0]
 
     results = collection.query(
         query_embeddings=[query_embedding.tolist()],
@@ -1002,7 +945,7 @@ def ask_question(question, collection, mode):
     context = "\n\n".join(
         (
             f"SOURCE {i + 1}\n"
-            f"PAGE: {metadata[i].get('page', 'Unknown')}\n\n"
+            f"PAGE: {metadata[i].get('page', 'Unknown')}\n"
             f"TEXT:\n{chunks[i]}"
         )
         for i in range(len(chunks))
@@ -1011,13 +954,13 @@ def ask_question(question, collection, mode):
     prompt = f"""
 You are PaperLens, a research paper question-answering assistant.
 
-Answer using ONLY the retrieved content from the research paper.
-Do NOT use outside knowledge. Do NOT invent information.
-Mention page numbers like (p. 3) when you use a source.
+Answer using ONLY the retrieved content from the paper.
+Do not use outside knowledge. Do not invent information.
+Mention page numbers like (p. 3) when possible.
 
 {STYLE_INSTRUCTIONS[mode]}
 
-If the answer cannot be found in the retrieved paper content, say:
+If the answer cannot be found in the retrieved content, say:
 The information is not available in the research paper.
 
 User question:
@@ -1050,10 +993,7 @@ def chat_button(chat_id, prefix):
         key=f"{prefix}_{chat_id}",
         use_container_width=True,
         type="primary" if is_current else "secondary",
-        help=(
-            f"{chat['paper_name']} · "
-            f"{len(chat['history'])} messages"
-        ),
+        help=f"{chat['paper_name']} · {len(chat['history'])} messages",
     ):
         open_chat(chat_id)
         st.rerun()
@@ -1065,11 +1005,9 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    # Answer style
     st.caption("Answer style")
 
     active_mode = st.session_state.explanation_mode or "Simple"
-
     mode_cols = st.columns(2)
 
     for col, mode_name in zip(mode_cols, MODES):
@@ -1097,7 +1035,6 @@ with st.sidebar:
         new_chat()
         st.rerun()
 
-    # Pinned chats
     pinned_ids = [
         chat_id
         for chat_id in st.session_state.pinned
@@ -1110,7 +1047,6 @@ with st.sidebar:
         for chat_id in pinned_ids:
             chat_button(chat_id, "pinned")
 
-    # Recent chats
     st.caption("Recents")
 
     recent_ids = [
@@ -1148,7 +1084,6 @@ with st.sidebar:
     else:
         st.caption("No chats yet. Upload a paper to begin.")
 
-    # Actions for the open chat
     current = get_current_chat()
 
     if current:
@@ -1176,7 +1111,6 @@ with st.sidebar:
 
         if st.session_state.confirm_delete == current["id"]:
             st.caption("Delete this chat and its messages?")
-
             yes_col, no_col = st.columns(2)
 
             with yes_col:
@@ -1197,7 +1131,6 @@ with st.sidebar:
                     args=(None,),
                     use_container_width=True,
                 )
-
         else:
             st.button(
                 "Delete chat",
@@ -1238,18 +1171,16 @@ if current_chat is None:
         label_visibility="collapsed",
     )
 
-    if uploaded_file:
+    if uploaded_file is not None:
         file_bytes = uploaded_file.getvalue()
-
-        # Prevent reprocessing the same uploaded file on reruns.
         upload_signature = hashlib.md5(file_bytes).hexdigest()
 
         if (
-            st.session_state.get("processed_upload_signature")
+            st.session_state.processed_upload_signature
             != upload_signature
         ):
-            with st.spinner("Reading and indexing the paper..."):
-                try:
+            try:
+                with st.spinner("Reading and indexing the paper..."):
                     pages, collection = process_pdf(file_bytes)
 
                     create_chat(
@@ -1262,10 +1193,10 @@ if current_chat is None:
                         upload_signature
                     )
 
-                    st.rerun()
+                st.rerun()
 
-                except Exception as e:
-                    st.error(f"Unable to process PDF: {e}")
+            except Exception as e:
+                st.error(f"Unable to process PDF: {e}")
 
 
 # ============================================================
@@ -1276,12 +1207,7 @@ else:
     pages = current_chat["pages"]
     collection = current_chat["collection"]
     history = current_chat["history"]
-
     mode = st.session_state.explanation_mode or "Simple"
-
-    # --------------------------------------------------------
-    # HEADER
-    # --------------------------------------------------------
 
     total_words = sum(
         len(page["text"].split())
@@ -1307,10 +1233,6 @@ else:
             on_click=ask_summary,
             use_container_width=True,
         )
-
-    # --------------------------------------------------------
-    # EMPTY STATE
-    # --------------------------------------------------------
 
     pending = st.session_state.pending
 
@@ -1338,10 +1260,7 @@ else:
                 use_container_width=True,
             )
 
-    # --------------------------------------------------------
-    # CHAT HISTORY
-    # --------------------------------------------------------
-
+    # Display previous messages
     for item in history:
         with st.chat_message("user"):
             st.write(item["question"])
@@ -1354,15 +1273,15 @@ else:
             distances = item.get("distances", [])
 
             cited_pages = sorted({
-                metadata_item.get("page")
-                for metadata_item in metadata
-                if metadata_item.get("page")
+                entry.get("page")
+                for entry in metadata
+                if entry.get("page")
             })
 
             if cited_pages:
                 st.markdown(
                     '<div class="pl-cites">Pages: '
-                    + ", ".join(str(page) for page in cited_pages)
+                    + ", ".join(str(p) for p in cited_pages)
                     + "</div>",
                     unsafe_allow_html=True,
                 )
@@ -1372,8 +1291,7 @@ else:
                     f"Sources ({len(chunks)} passages)"
                 ):
                     for i, chunk in enumerate(chunks):
-                        page_number = metadata[i].get("page", "?")
-
+                        page_no = metadata[i].get("page", "?")
                         distance_text = ""
 
                         if i < len(distances):
@@ -1382,15 +1300,11 @@ else:
                             )
 
                         st.markdown(
-                            f"**Page {page_number}**{distance_text}"
+                            f"**Page {page_no}**{distance_text}"
                         )
-
                         st.caption(chunk)
 
-    # --------------------------------------------------------
-    # PROCESS PENDING REQUEST
-    # --------------------------------------------------------
-
+    # Process pending question or summary before showing input.
     if pending:
         with st.chat_message("user"):
             st.write(pending["question"])
@@ -1400,11 +1314,7 @@ else:
                 try:
                     if pending["kind"] == "summary":
                         answer = generate_summary(pages)
-
-                        chunks = []
-                        metadata = []
-                        distances = []
-
+                        chunks, metadata, distances = [], [], []
                     else:
                         (
                             answer,
@@ -1426,9 +1336,7 @@ else:
                     })
 
                     move_to_top(current_chat["id"])
-
                     st.session_state.pending = None
-
                     st.rerun()
 
                 except Exception as e:
@@ -1439,17 +1347,18 @@ else:
                     else:
                         st.error(friendly_error(e))
 
-    # --------------------------------------------------------
-    # CHAT INPUT
-    # Keep Streamlit's normal send arrow
-    # --------------------------------------------------------
+    # ========================================================
+    # CHAT INPUT — NORMAL SEND ARROW
+    # ========================================================
 
-    question = st.chat_input("Ask about this paper...")
+    question = st.chat_input(
+        "Ask about this paper...",
+        key="paperlens_chat_input",
+    )
 
     if question and question.strip():
         st.session_state.pending = {
             "kind": "question",
             "question": question.strip(),
         }
-
         st.rerun()
