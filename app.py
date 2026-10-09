@@ -248,122 +248,102 @@ header[data-testid="stHeader"] {
     box-shadow: 0 0 0 1px #2F5D8A !important;
 }
 
-
 /* ========================================================
-   CHAT INPUT — ONLY CHANGE: NEUTRAL BORDER, NO RED OUTLINE
+   CHAT TYPING BAR — NO RED FOCUS OUTLINE
    ======================================================== */
 
-/* Outer typing bar */
-[data-testid="stChatInput"] {
+[data-testid="stChatInput"],
+[data-testid="stChatInput"] > div,
+[data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] [data-baseweb="base-input"] {
     background: #FFFFFF !important;
     border: 1px solid #D5DDE6 !important;
     border-radius: 18px !important;
     box-shadow: none !important;
     outline: none !important;
-    transition: none !important;
 }
 
-/* Keep the same neutral border while hovering or typing */
 [data-testid="stChatInput"]:hover,
 [data-testid="stChatInput"]:focus,
-[data-testid="stChatInput"]:focus-within {
+[data-testid="stChatInput"]:focus-within,
+[data-testid="stChatInput"] > div:focus-within,
+[data-testid="stChatInput"] [data-baseweb="textarea"]:focus-within,
+[data-testid="stChatInput"] [data-baseweb="base-input"]:focus-within {
     background: #FFFFFF !important;
-    border: 1px solid #D5DDE6 !important;
+    border-color: #D5DDE6 !important;
     box-shadow: none !important;
     outline: none !important;
 }
 
-/* Remove inner textarea and input focus borders */
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] textarea:focus,
-[data-testid="stChatInput"] textarea:focus-visible,
-[data-testid="stChatInput"] [data-baseweb="textarea"],
-[data-testid="stChatInput"] [data-baseweb="textarea"]:focus,
-[data-testid="stChatInput"] [data-baseweb="textarea"]:focus-within,
-[data-testid="stChatInput"] [data-baseweb="base-input"],
-[data-testid="stChatInput"] [data-baseweb="base-input"]:focus-within {
+[data-testid="stChatInput"] textarea:focus-visible {
     background: transparent !important;
     border: none !important;
-    outline: none !important;
     box-shadow: none !important;
+    outline: none !important;
+    caret-color: #2F5D8A !important;
 }
 
-/* Remove nested focus rings without affecting other inputs */
 [data-testid="stChatInput"] *:focus,
 [data-testid="stChatInput"] *:focus-visible {
     outline: none !important;
     box-shadow: none !important;
 }
 
-[data-testid="stChatInput"] textarea {
-    caret-color: #2F5D8A !important;
-}
-
 
 /* ========================================================
-   SEND BUTTON — ONLY CHANGE: BLUE CIRCLE WITH WHITE UP ARROW
+   SEND BUTTON — SMALL CHATGPT-STYLE UP ARROW
    ======================================================== */
 
 [data-testid="stChatInputSubmitButton"] {
     position: relative !important;
-    background: #2F5D8A !important;
-    color: #FFFFFF !important;
-    width: 38px !important;
-    height: 38px !important;
-    min-width: 38px !important;
-    min-height: 38px !important;
+    width: 36px !important;
+    height: 36px !important;
+    min-width: 36px !important;
+    min-height: 36px !important;
     padding: 0 !important;
     margin: 0 4px !important;
+    border: none !important;
+    border-radius: 50% !important;
+    background: #2F5D8A !important;
+    box-shadow: none !important;
+    outline: none !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    border: none !important;
-    border-radius: 50% !important;
-    box-shadow: none !important;
-    outline: none !important;
-    overflow: hidden !important;
 }
 
-/* Remove the old icon completely */
+/* Hide the original icon */
 [data-testid="stChatInputSubmitButton"] svg {
     display: none !important;
 }
 
-/* Keep inner wrappers transparent */
-[data-testid="stChatInputSubmitButton"] > *,
-[data-testid="stChatInputSubmitButton"] span,
-[data-testid="stChatInputSubmitButton"] div {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-}
-
-/* White vertical arrow shaft */
+/* Small white arrow shaft */
 [data-testid="stChatInputSubmitButton"]::before {
     content: "";
     position: absolute;
     width: 2px;
-    height: 13px;
-    background: #FFFFFF;
+    height: 12px;
     left: 50%;
-    top: 15px;
+    top: 14px;
     transform: translateX(-50%);
+    background: #FFFFFF;
     border-radius: 2px;
     pointer-events: none;
 }
 
-/* White arrow head */
+/* Small white arrow head */
 [data-testid="stChatInputSubmitButton"]::after {
     content: "";
     position: absolute;
-    width: 8px;
-    height: 8px;
-    border-left: 2px solid #FFFFFF;
-    border-top: 2px solid #FFFFFF;
+    width: 7px;
+    height: 7px;
     left: 50%;
-    top: 12px;
+    top: 11px;
     transform: translateX(-50%) rotate(45deg);
+    border-top: 2px solid #FFFFFF;
+    border-left: 2px solid #FFFFFF;
     box-sizing: border-box;
     pointer-events: none;
 }
@@ -373,7 +353,7 @@ header[data-testid="stHeader"] {
     background: #254B72 !important;
 }
 
-/* No focus ring on the send button */
+/* Remove send-button focus outline */
 [data-testid="stChatInputSubmitButton"]:focus,
 [data-testid="stChatInputSubmitButton"]:focus-visible,
 [data-testid="stChatInputSubmitButton"]:active {
