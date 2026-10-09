@@ -64,8 +64,7 @@ STYLE_INSTRUCTIONS = {
 
 
 # ============================================================
-# CSS — ORIGINAL PAPERLENS DESIGN
-# Only requested input/button/toolbar styling is changed.
+# CSS — PAPERLENS DESIGN
 # ============================================================
 
 st.markdown(
@@ -86,7 +85,7 @@ footer, #MainMenu {
     display: none;
 }
 
-/* Hide the top share/star toolbar icons */
+/* Hide the top toolbar and share/star actions */
 [data-testid="stToolbar"],
 [data-testid="stToolbarActions"],
 [data-testid="stAppDeployButton"] {
@@ -236,14 +235,14 @@ header[data-testid="stHeader"] {
     text-align: center !important;
 }
 
-/* Keep the existing general text-field styling */
+/* General text fields */
 [data-testid="stTextInput"] input:focus {
     border-color: #2F5D8A !important;
     box-shadow: 0 0 0 1px #2F5D8A !important;
 }
 
 /* ========================================================
-   CHAT TYPING BAR — NO BLUE OUTLINE
+   CHAT INPUT — NO BLUE OUTLINE
    ======================================================== */
 
 [data-testid="stChatInput"] {
@@ -256,7 +255,6 @@ header[data-testid="stHeader"] {
     outline: none !important;
 }
 
-/* Keep the border neutral while typing */
 [data-testid="stChatInput"]:focus,
 [data-testid="stChatInput"]:focus-within {
     border: 1px solid #D5DDE6 !important;
@@ -264,7 +262,6 @@ header[data-testid="stHeader"] {
     outline: none !important;
 }
 
-/* No outline or glow on the typing area */
 [data-testid="stChatInput"] [data-baseweb="textarea"],
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] [data-baseweb="base-input"] {
@@ -283,37 +280,66 @@ header[data-testid="stHeader"] {
 }
 
 /* ========================================================
-   BLUE CIRCULAR SEND BUTTON
+   SEND BUTTON — BLUE CIRCLE, WHITE ARROW, NO INNER SQUARE
    ======================================================== */
 
+[data-testid="stChatInputSubmitButton"] {
+    background: #2F5D8A !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    padding: 0 !important;
+    margin: 0 4px !important;
+    box-shadow: none !important;
+    outline: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+
+/* Remove background, borders and shadows behind the icon */
+[data-testid="stChatInputSubmitButton"] *,
+[data-testid="stChatInputSubmitButton"] span,
+[data-testid="stChatInputSubmitButton"] div {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+/* Keep the arrow white */
 [data-testid="stChatInputSubmitButton"] svg {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    color: #FFFFFF !important;
+    fill: none !important;
+    stroke: #FFFFFF !important;
+    width: 20px !important;
+    height: 20px !important;
 }
 
-[data-testid="stChatInputSubmitButton"] span,
-[data-testid="stChatInputSubmitButton"] div {
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-/* White arrow */
-[data-testid="stChatInputSubmitButton"] svg,
 [data-testid="stChatInputSubmitButton"] svg path,
 [data-testid="stChatInputSubmitButton"] svg line,
 [data-testid="stChatInputSubmitButton"] svg polyline {
-    color: #FFFFFF !important;
+    background: transparent !important;
+    fill: none !important;
     stroke: #FFFFFF !important;
 }
 
-/* Darker blue on hover */
+/* Hover */
 [data-testid="stChatInputSubmitButton"]:hover {
-    background-color: #254B72 !important;
+    background: #254B72 !important;
 }
 
-/* No focus ring around the send button */
+/* Remove focus rings */
 [data-testid="stChatInputSubmitButton"]:focus,
 [data-testid="stChatInputSubmitButton"]:focus-visible,
 [data-testid="stChatInputSubmitButton"]:active {
