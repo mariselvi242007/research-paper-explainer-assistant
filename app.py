@@ -85,16 +85,24 @@ footer, #MainMenu {
     display: none;
 }
 
-/* Hide the top toolbar and share/star actions */
-[data-testid="stToolbar"],
+/* Hide toolbar actions but preserve the header and sidebar toggle */
 [data-testid="stToolbarActions"],
 [data-testid="stAppDeployButton"] {
     display: none !important;
-    visibility: hidden !important;
 }
 
+/* Preserve Streamlit header */
 header[data-testid="stHeader"] {
-    background: transparent;
+    background: transparent !important;
+}
+
+/* Keep sidebar reopening controls visible */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
 }
 
 .block-container {
@@ -242,7 +250,7 @@ header[data-testid="stHeader"] {
 }
 
 /* ========================================================
-   CHAT INPUT — NO BLUE OUTLINE
+   CHAT INPUT — NEUTRAL BORDER, NO RED/BLUE OUTLINE
    ======================================================== */
 
 [data-testid="stChatInput"] {
@@ -253,84 +261,97 @@ header[data-testid="stHeader"] {
     border-radius: 18px !important;
     box-shadow: none !important;
     outline: none !important;
+    transition: none !important;
 }
 
+[data-testid="stChatInput"]:hover,
 [data-testid="stChatInput"]:focus,
 [data-testid="stChatInput"]:focus-within {
+    background: #FFFFFF !important;
     border: 1px solid #D5DDE6 !important;
     box-shadow: none !important;
     outline: none !important;
 }
 
-[data-testid="stChatInput"] [data-baseweb="textarea"],
+/* Remove nested input outlines and focus rings */
 [data-testid="stChatInput"] textarea,
-[data-testid="stChatInput"] [data-baseweb="base-input"] {
+[data-testid="stChatInput"] textarea:focus,
+[data-testid="stChatInput"] textarea:focus-visible,
+[data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] [data-baseweb="textarea"]:focus-within,
+[data-testid="stChatInput"] [data-baseweb="base-input"],
+[data-testid="stChatInput"] [data-baseweb="base-input"]:focus-within {
+    background: transparent !important;
+    border: none !important;
     outline: none !important;
     box-shadow: none !important;
-    border: none !important;
-    background: transparent !important;
+}
+
+/* Neutralize any inner focus styling */
+[data-testid="stChatInput"] *:focus,
+[data-testid="stChatInput"] *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+[data-testid="stChatInput"] textarea {
     caret-color: #2F5D8A !important;
 }
 
-[data-testid="stChatInput"] textarea:focus,
-[data-testid="stChatInput"] textarea:focus-visible {
-    outline: none !important;
-    box-shadow: none !important;
-    border: none !important;
-}
-
 /* ========================================================
-   SEND BUTTON — BLUE CIRCLE, WHITE ARROW, NO INNER SQUARE
+   SEND BUTTON — BLUE CIRCLE AND CLEAN WHITE ARROW
    ======================================================== */
 
 [data-testid="stChatInputSubmitButton"] {
     background: #2F5D8A !important;
     color: #FFFFFF !important;
-    border: none !important;
-    border-radius: 50% !important;
+
     width: 38px !important;
     height: 38px !important;
     min-width: 38px !important;
     min-height: 38px !important;
+
     padding: 0 !important;
     margin: 0 4px !important;
-    box-shadow: none !important;
-    outline: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+
+    border: none !important;
+    border-radius: 50% !important;
+    box-shadow: none !important;
+    outline: none !important;
     overflow: hidden !important;
 }
 
-/* Remove background, borders and shadows behind the icon */
-[data-testid="stChatInputSubmitButton"] *,
+/* Remove square backgrounds around the icon */
+[data-testid="stChatInputSubmitButton"] > *,
 [data-testid="stChatInputSubmitButton"] span,
 [data-testid="stChatInputSubmitButton"] div {
-    background-color: transparent !important;
+    background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     outline: none !important;
 }
 
-/* Keep the arrow white */
+/* Arrow shape and color */
 [data-testid="stChatInputSubmitButton"] svg {
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
     background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
     color: #FFFFFF !important;
     fill: none !important;
     stroke: #FFFFFF !important;
-    width: 20px !important;
-    height: 20px !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
+/* Ensure arrow strokes remain white */
 [data-testid="stChatInputSubmitButton"] svg path,
 [data-testid="stChatInputSubmitButton"] svg line,
 [data-testid="stChatInputSubmitButton"] svg polyline {
-    background: transparent !important;
-    fill: none !important;
     stroke: #FFFFFF !important;
 }
 
@@ -339,7 +360,7 @@ header[data-testid="stHeader"] {
     background: #254B72 !important;
 }
 
-/* Remove focus rings */
+/* No button focus ring */
 [data-testid="stChatInputSubmitButton"]:focus,
 [data-testid="stChatInputSubmitButton"]:focus-visible,
 [data-testid="stChatInputSubmitButton"]:active {
@@ -1412,7 +1433,7 @@ else:
                     else:
                         st.error(friendly_error(e))
 
-    # Standard Streamlit chat input
+    # Chat input
     question = st.chat_input(
         "Ask about this paper...",
         key="paperlens_chat_input",
