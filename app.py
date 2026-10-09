@@ -1120,171 +1120,84 @@ def section(label):
 # 13. SIDEBAR
 # ============================================================
 
-def chat_button(chat_id, prefix):
-    chat = st.session_state.chats[chat_id]
-
-    title = chat["title"]
-
-    if len(title) > 30:
-        title = title[:27] + "..."
-
     is_current = chat_id == st.session_state.current_chat_id
-
+ 
     if st.button(
         title,
         key=f"{prefix}_{chat_id}",
         use_container_width=True,
         type="primary" if is_current else "secondary",
-        help=(
-            f"{chat['title']} · "
-            f"{len(chat['history'])} messages"
-        ),
     ):
         open_chat(chat_id)
         st.rerun()
-
-
+ 
+ 
 with st.sidebar:
-
     st.markdown(
-        '<div class="pl-logo">PaperLens</div>',
+        '<div class="pl-logo"><div class="pl-logo-mark">P</div>'
+        '<div class="pl-logo-name">PaperLens</div></div>',
         unsafe_allow_html=True,
     )
-
-    section("Answer style")
-
+ 
+    # Answer style, at the top
+    st.markdown('<div class="pl-section">Answer style</div>', unsafe_allow_html=True)
+    st.segmented_control(
+        "Answer style",
+        MODES,
+        key="explanation_mode",
+        label_visibility="collapsed",
+    )
     active_mode = st.session_state.explanation_mode or "Simple"
-
-    mode_cols = st.columns(2)
-
-    for col, mode_name in zip(mode_cols, MODES):
-        with col:
-            st.button(
-                mode_name,
-                key=f"mode_{mode_name}",
-                on_click=set_mode,
-                args=(mode_name,),
-                use_container_width=True,
-                type=(
-                    "primary"
-                    if mode_name == active_mode
-                    else "secondary"
-                ),
-            )
-
-    st.caption(MODE_HINTS[active_mode])
-
+    st.markdown(f'<div class="pl-hint">{MODE_HINTS[active_mode]}</div>', unsafe_allow_html=True)
+ 
     st.write("")
-
-    if st.button(
-        "New chat",
-        key="new_chat_btn",
-        icon=":material/add:",
-        type="primary",
-        use_container_width=True,
-    ):
+    if st.button("New chat", key="new_chat_btn", use_container_width=True):
         new_chat()
         st.rerun()
-
-    # Favourites
-    pinned_ids = [
-        chat_id
-        for chat_id in st.session_state.pinned
-        if chat_id in st.session_state.chats
-    ]
-
+ 
+    # Pinned
+    pinned_ids = [c for c in st.session_state.pinned if c in st.session_state.chats]
     if pinned_ids:
-        section("Favourites")
-
-        with st.container(key="chatlist_fav"):
-            for chat_id in pinned_ids:
-                chat_button(chat_id, "pinned")
-
-    # Recents
-    section("Recents")
-
+        st.markdown('<div class="pl-section">Pinned</div>', unsafe_allow_html=True)
+        for chat_id in pinned_ids:
+            chat_button(chat_id, "pinned")
+ 
+    # Recents / history
+    st.markdown('<div class="pl-section">Recents</div>', unsafe_allow_html=True)
     recent_ids = [
-        chat_id
-        for chat_id in st.session_state.recents
-        if (
-            chat_id in st.session_state.chats
-            and chat_id not in st.session_state.pinned
-        )
+        c
+        for c in st.session_state.recents
+        if c in st.session_state.chats and c not in st.session_state.pinned
     ]
-
-    if len(recent_ids) > 4:
-        search = st.text_input(
-            "Search chats",
-            placeholder="Search chats",
-            label_visibility="collapsed",
-            key="chat_search",
-        ).strip().lower()
-
-        if search:
-            recent_ids = [
-                chat_id
-                for chat_id in recent_ids
-                if search in st.session_state.chats[chat_id]["title"].lower()
-            ]
-
     if recent_ids:
-        with st.container(key="chatlist_recent"):
-            for chat_id in recent_ids:
-                chat_button(chat_id, "recent")
+        for chat_id in recent_ids:
+            chat_button(chat_id, "recent")
     else:
-        st.caption("No chats yet. Upload a paper to begin.")
-
-    # Chat actions
+        st.caption("Your chats will appear here.")
+ 
+    # Options for the open chat
     current = get_current_chat()
-
     if current:
-        section("Chat actions")
+        st.markdown('<div class="pl-section">This chat</div>', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+ 
+        with c1:
+            is_pinned = current["id"] in st.session_state.pinned
+            if st.button("Unpin" if is_pinned else "Pin", use_container_width=True):
+                toggle_pin(current["id"])
+                st.rerun()
+ 
+        with c2:
+            if st.button("Clear", use_container_width=True):
+                current["history"] = []
+                st.rerun()
+ 
+        with c3:
+            if st.button("Delete", use_container_width=True):
+                delete_chat(current["id"])
+                st.rerun()
+ 
 
-        with st.container(key="chat_actions"):
-
-            st.button(
-                "Clear messages",
-                key="act_clear",
-                icon=":material/ink_eraser:",
-                on_click=clear_chat,
-                args=(current["id"],),
-                use_container_width=True,
-            )
-
-            if st.session_state.confirm_delete == current["id"]:
-                st.caption("Delete this chat and its messages?")
-
-                yes_col, no_col = st.columns(2)
-
-                with yes_col:
-                    if st.button(
-                        "Delete",
-                        key="act_delete_yes",
-                        type="primary",
-                        use_container_width=True,
-                    ):
-                        st.session_state.confirm_delete = None
-                        delete_chat(current["id"])
-                        st.rerun()
-
-                with no_col:
-                    st.button(
-                        "Cancel",
-                        key="act_delete_no",
-                        on_click=set_confirm_delete,
-                        args=(None,),
-                        use_container_width=True,
-                    )
-
-            else:
-                st.button(
-                    "Delete chat",
-                    key="act_delete",
-                    icon=":material/delete:",
-                    on_click=set_confirm_delete,
-                    args=(current["id"],),
-                    use_container_width=True,
-                )
 
 
 # ============================================================
