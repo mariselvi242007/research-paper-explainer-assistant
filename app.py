@@ -1,9 +1,9 @@
-
 import html
 import re
 import uuid
 import hashlib
 from io import BytesIO
+from urllib.parse import quote
 from datetime import datetime, timedelta, timezone
 
 import streamlit as st
@@ -60,110 +60,217 @@ STYLE_INSTRUCTIONS = {
     ),
 }
 
+BLUE = "#2F5D8A"
+BLUE_DARK = "#244A6E"
+BLUE_SOFT = "#E4EDF8"
+
 
 # ============================================================
 # 2. STYLING
 # ============================================================
 
 st.markdown(
-    """
+    f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:wght@400;600&family=Public+Sans:wght@400;500;600;700&display=swap');
 
-.stApp {
+.stApp {{
     font-family: 'Public Sans', system-ui, sans-serif;
-}
+}}
 
-footer, #MainMenu {
-    display: none;
-}
+/* ---- Hide Streamlit's own top-right toolbar and footer ---- */
+footer,
+#MainMenu,
+[data-testid="stToolbar"],
+[data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"],
+[data-testid="stStatusWidget"],
+[data-testid="stDecoration"],
+.stDeployButton {{
+    display: none !important;
+}}
 
-header[data-testid="stHeader"] {
+header[data-testid="stHeader"] {{
     background: transparent;
-}
+}}
 
-.block-container {
+.block-container {{
     max-width: 900px;
     padding-top: 2rem;
     padding-bottom: 5rem;
-}
+}}
 
-.pl-logo {
+/* ---- Typography ---- */
+.pl-logo {{
     font: 600 1.7rem 'Newsreader', Georgia, serif;
-    margin-bottom: .8rem;
-}
+    margin-bottom: .4rem;
+    color: {BLUE};
+}}
 
-.pl-title {
+.pl-section {{
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #7A8899;
+    margin: 1.2rem 0 .4rem 0;
+}}
+
+.pl-title {{
     font: 600 1.65rem 'Newsreader', Georgia, serif;
     line-height: 1.3;
-}
+    margin-bottom: .2rem;
+}}
 
-.pl-meta {
+.pl-meta {{
     color: #66758a;
     font-size: .85rem;
-}
+    margin-bottom: .6rem;
+}}
 
-.pl-hero-title {
+.pl-hero-title {{
     font: 600 2.8rem 'Newsreader', Georgia, serif;
     line-height: 1.15;
     margin: 2rem 0 .6rem 0;
-}
+}}
 
-.pl-hero-sub {
+.pl-hero-sub {{
     color: #66758a;
     font-size: 1.05rem;
     margin-bottom: 1.5rem;
-}
+}}
 
-.pl-empty {
+.pl-empty {{
     text-align: center;
     padding: 2.5rem 1rem 1.5rem 1rem;
-}
+}}
 
-.pl-empty b {
+.pl-empty b {{
     font: 600 1.5rem 'Newsreader', Georgia, serif;
-}
+}}
 
-.pl-empty span {
+.pl-empty span {{
     display: block;
     color: #66758a;
     margin-top: .4rem;
-}
+}}
 
-.pl-cites {
+.pl-cites {{
     color: #66758a;
     font-size: .82rem;
     margin-top: .5rem;
-}
+}}
 
-[data-testid="stChatMessage"] {
+/* ---- Chat layout: question on the right, answer on the left ---- */
+.pl-user-row {{
+    display: flex;
+    justify-content: flex-end;
+    margin: 1rem 0 .6rem 0;
+}}
+
+.pl-user-bubble {{
+    background: {BLUE_SOFT};
+    color: #1B2B3C;
+    padding: .75rem 1.1rem;
+    border-radius: 18px 18px 4px 18px;
+    max-width: 75%;
+    line-height: 1.5;
+    word-wrap: break-word;
+}}
+
+[data-testid="stVerticalBlockBorderWrapper"] {{
     border-radius: 14px;
-    border: 1px solid #E3E9F0;
-}
+}}
 
-[data-testid="stChatInput"]:focus-within {
-    border-color: #2F5D8A !important;
-}
+/* ---- Inputs ---- */
+[data-testid="stChatInput"]:focus-within {{
+    border-color: {BLUE} !important;
+}}
 
-[data-testid="stFileUploaderDropzone"] {
+[data-testid="stFileUploaderDropzone"] {{
     border: 2px dashed #9DB6CF;
     border-radius: 16px;
     padding: 1.5rem;
     background: #F7FAFD;
-}
+}}
 
-[data-testid="stSidebar"] {
+/* ---- Sidebar ---- */
+[data-testid="stSidebar"] {{
     background: #F7F9FC;
-}
+}}
 
-[data-testid="stSidebar"] button {
+[data-testid="stSidebar"] button {{
     border-radius: 8px;
-}
+}}
 
-.stButton button {
+.stButton button {{
     transition: all .15s ease;
-}
+}}
 
+/* ---- Primary buttons: blue instead of red ---- */
+button[kind="primary"],
+[data-testid="stBaseButton-primary"] {{
+    background-color: {BLUE} !important;
+    border-color: {BLUE} !important;
+    color: #FFFFFF !important;
+}}
+
+button[kind="primary"]:hover,
+[data-testid="stBaseButton-primary"]:hover {{
+    background-color: {BLUE_DARK} !important;
+    border-color: {BLUE_DARK} !important;
+    color: #FFFFFF !important;
+}}
+
+button[kind="secondary"]:hover,
+[data-testid="stBaseButton-secondary"]:hover {{
+    border-color: {BLUE} !important;
+    color: {BLUE} !important;
+}}
+
+/* ---- Chat lists (Favourites and Recents) ---- */
+[class*="st-key-chatlist"] button {{
+    justify-content: flex-start !important;
+    text-align: left !important;
+}}
+
+[class*="st-key-chatlist"] button[kind="secondary"],
+[class*="st-key-chatlist"] [data-testid="stBaseButton-secondary"] {{
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    color: #33475B !important;
+}}
+
+[class*="st-key-chatlist"] button[kind="secondary"]:hover,
+[class*="st-key-chatlist"] [data-testid="stBaseButton-secondary"]:hover {{
+    background: #EAF0F7 !important;
+    border-color: transparent !important;
+    color: {BLUE} !important;
+}}
+
+[class*="st-key-chatlist"] button[kind="primary"],
+[class*="st-key-chatlist"] [data-testid="stBaseButton-primary"] {{
+    background: {BLUE_SOFT} !important;
+    border: 1px solid transparent !important;
+    border-left: 3px solid {BLUE} !important;
+    color: #1F4468 !important;
+    font-weight: 600;
+}}
+
+/* ---- Chat actions: quiet, text-style buttons ---- */
+.st-key-chat_actions button {{
+    justify-content: flex-start !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+    box-shadow: none !important;
+    color: #33475B !important;
+    font-weight: 500;
+}}
+
+.st-key-chat_actions button:hover {{
+    background: #EAF0F7 !important;
+    color: {BLUE} !important;
+}}
 </style>
 """,
     unsafe_allow_html=True,
@@ -181,8 +288,10 @@ defaults = {
     "pinned": [],
     "explanation_mode": "Simple",
     "upload_key": 0,
+    "add_key": 0,
     "pending": None,
     "confirm_delete": None,
+    "notice": None,
 }
 
 for key, value in defaults.items():
@@ -215,7 +324,6 @@ try:
     if groq_key:
         groq_client = Groq(api_key=groq_key)
 
-        # Check the models available to this API key.
         available_models = groq_client.models.list()
         available_ids = [
             model.id for model in available_models.data
@@ -226,8 +334,6 @@ try:
                 groq_model = candidate
                 break
 
-        # If none of the preferred IDs is available, try other
-        # compatible model families listed by the account.
         if groq_model is None:
             for model_id in available_ids:
                 if any(
@@ -255,29 +361,7 @@ except Exception as e:
     print("Gemini initialization failed:", str(e)[:300])
 
 
-# ============================================================
-# 5. MODEL STATUS
-# ============================================================
-
-with st.sidebar:
-    st.markdown(
-        '<div class="pl-logo">📚 PaperLens</div>',
-        unsafe_allow_html=True,
-    )
-
-    if groq_client is not None and groq_model:
-        st.success("Primary AI: Groq")
-        st.caption(f"Groq model: {groq_model}")
-    else:
-        st.warning("Groq is unavailable. Gemini will be tried first.")
-
-    if client is not None:
-        st.caption("Backup AI: Gemini")
-        st.caption(f"Gemini model: {PRIMARY_MODEL}")
-    else:
-        st.warning("Gemini backup is not configured.")
-
-
+# Backend details are no longer shown in the interface.
 if not (
     groq_client is not None and groq_model is not None
 ) and client is None:
@@ -289,7 +373,7 @@ if not (
 
 
 # ============================================================
-# 6. EMBEDDING MODEL AND CHROMADB
+# 5. EMBEDDING MODEL AND CHROMADB
 # ============================================================
 
 @st.cache_resource
@@ -307,7 +391,7 @@ chroma_client = load_chroma_client()
 
 
 # ============================================================
-# 7. PDF PROCESSING
+# 6. PDF PROCESSING
 # ============================================================
 
 def extract_pdf_pages(file_bytes):
@@ -353,8 +437,8 @@ def create_collection_name(file_bytes):
     return f"research_paper_{digest}"
 
 
-def process_pdf(file_bytes):
-    """Extract, embed, and index the uploaded PDF."""
+def process_pdf(file_bytes, paper_name):
+    """Extract, embed, and index one uploaded PDF."""
     pages = extract_pdf_pages(file_bytes)
 
     if not pages:
@@ -374,7 +458,6 @@ def process_pdf(file_bytes):
         name=collection_name
     )
 
-    # Index the PDF only if its collection is empty.
     if collection.count() == 0:
         embeddings = embedding_model.encode(
             chunks,
@@ -391,22 +474,51 @@ def process_pdf(file_bytes):
             ],
         )
 
-    return pages, collection
+    return {
+        "id": collection_name,
+        "name": paper_name,
+        "pages": pages,
+        "collection": collection,
+    }
+
+
+def process_uploaded_files(files):
+    """Process several PDFs. Returns (papers, error_messages)."""
+    papers = []
+    errors = []
+
+    for uploaded in files:
+        try:
+            papers.append(
+                process_pdf(uploaded.getvalue(), uploaded.name)
+            )
+        except Exception as e:
+            errors.append(f"{uploaded.name}: {e}")
+
+    return papers, errors
 
 
 # ============================================================
-# 8. CHAT MANAGEMENT
+# 7. CHAT MANAGEMENT
 # ============================================================
 
-def create_chat(paper_name, collection, pages):
+def make_title(papers):
+    if not papers:
+        return "New chat"
+
+    if len(papers) == 1:
+        return papers[0]["name"]
+
+    return f"{papers[0]['name']} +{len(papers) - 1} more"
+
+
+def create_chat(papers):
     chat_id = uuid.uuid4().hex[:10]
 
     st.session_state.chats[chat_id] = {
         "id": chat_id,
-        "title": paper_name,
-        "paper_name": paper_name,
-        "collection": collection,
-        "pages": pages,
+        "title": make_title(papers),
+        "papers": papers,
         "history": [],
     }
 
@@ -415,6 +527,22 @@ def create_chat(paper_name, collection, pages):
     st.session_state.pending = None
 
     return chat_id
+
+
+def add_papers_to_chat(chat, new_papers):
+    """Add papers to an existing chat, skipping duplicates."""
+    existing = {paper["id"] for paper in chat["papers"]}
+    added = 0
+
+    for paper in new_papers:
+        if paper["id"] not in existing:
+            chat["papers"].append(paper)
+            existing.add(paper["id"])
+            added += 1
+
+    chat["title"] = make_title(chat["papers"])
+
+    return added
 
 
 def get_current_chat():
@@ -489,15 +617,19 @@ def ask_suggestion(question):
     }
 
 
-def ask_summary():
+def ask_summary(multi=False):
     st.session_state.pending = {
         "kind": "summary",
-        "question": "Summarize this paper.",
+        "question": (
+            "Summarize these papers and explain how they relate."
+            if multi
+            else "Summarize this paper."
+        ),
     }
 
 
 # ============================================================
-# 9. AI ERROR HANDLING
+# 8. AI ERROR HANDLING
 # ============================================================
 
 class QuotaExceeded(Exception):
@@ -583,8 +715,8 @@ def friendly_error(error):
 
         if seconds is None:
             return (
-                "The available Gemini models could not answer. "
-                "Check your quota, model access, and API settings."
+                "The AI service could not answer right now. "
+                "Please try again in a little while."
             )
 
         if seconds < 3600:
@@ -616,7 +748,7 @@ def friendly_error(error):
 
 
 # ============================================================
-# 10. GENERATE TEXT: GROQ FIRST, GEMINI BACKUP
+# 9. GENERATE TEXT: GROQ FIRST, GEMINI BACKUP
 # ============================================================
 
 def generate_text(prompt):
@@ -627,9 +759,6 @@ def generate_text(prompt):
 
     groq_error = None
 
-    # --------------------------------------------------------
-    # FIRST: GROQ
-    # --------------------------------------------------------
     if groq_client is not None and groq_model is not None:
         try:
             response = groq_client.chat.completions.create(
@@ -651,16 +780,14 @@ def generate_text(prompt):
                     },
                 ],
                 temperature=0.2,
-                max_tokens=1800,
+                max_tokens=2200,
             )
 
             answer = response.choices[0].message.content
 
             if answer and answer.strip():
-                return (
-                    answer.strip()
-                    + f"\n\n*AI model: Groq ({groq_model})*"
-                )
+                print(f"Answered by Groq ({groq_model})")
+                return answer.strip()
 
             raise RuntimeError("Groq returned an empty answer.")
 
@@ -672,9 +799,6 @@ def generate_text(prompt):
                 groq_error[:300],
             )
 
-    # --------------------------------------------------------
-    # SECOND: GEMINI
-    # --------------------------------------------------------
     quota_models = []
     unavailable_models = []
     retry_delays = []
@@ -691,10 +815,8 @@ def generate_text(prompt):
                 answer = getattr(response, "text", None)
 
                 if answer and answer.strip():
-                    return (
-                        answer.strip()
-                        + f"\n\n*AI model: Gemini ({model})*"
-                    )
+                    print(f"Answered by Gemini ({model})")
+                    return answer.strip()
 
                 gemini_errors.append(
                     f"{model}: empty response"
@@ -735,9 +857,6 @@ def generate_text(prompt):
                         f"{model}: {message[:200]}"
                     )
 
-    # --------------------------------------------------------
-    # BOTH PROVIDERS FAILED
-    # --------------------------------------------------------
     if quota_models or unavailable_models:
         raise QuotaExceeded(
             quota_models,
@@ -748,9 +867,7 @@ def generate_text(prompt):
     details = []
 
     if groq_error:
-        details.append(
-            f"Groq error: {groq_error[:250]}"
-        )
+        details.append(f"Groq error: {groq_error[:250]}")
 
     details.extend(gemini_errors)
 
@@ -764,16 +881,28 @@ def generate_text(prompt):
 
 
 # ============================================================
-# 11. GENERATE A PAPER SUMMARY
+# 10. GENERATE A SUMMARY (ONE OR MANY PAPERS)
 # ============================================================
 
-def generate_summary(pages):
-    paper_text = "\n\n".join(
-        f"PAGE {page['page']}\n{page['text']}"
-        for page in pages
-    )[:60000]
+def generate_summary(papers):
+    per_paper_limit = 60000 // max(len(papers), 1)
 
-    prompt = f"""
+    paper_blocks = []
+
+    for paper in papers:
+        text = "\n\n".join(
+            f"PAGE {page['page']}\n{page['text']}"
+            for page in paper["pages"]
+        )[:per_paper_limit]
+
+        paper_blocks.append(
+            f"===== PAPER: {paper['name']} =====\n{text}"
+        )
+
+    all_text = "\n\n".join(paper_blocks)
+
+    if len(papers) == 1:
+        prompt = f"""
 You are a research paper analysis assistant.
 
 Analyze ONLY the research paper provided below.
@@ -795,49 +924,108 @@ If information is not available in the paper, write:
 Not specified in the paper.
 
 Research paper:
-{paper_text}
+{all_text}
+"""
+    else:
+        prompt = f"""
+You are a research paper analysis assistant.
+
+Analyze ONLY the research papers provided below.
+Do not use outside knowledge. Do not invent information.
+
+For EACH paper, write a heading with the paper name, followed by
+short bullets for: objective, methodology, dataset, main results,
+and limitations. Keep each bullet to one sentence.
+
+Then add a final section titled **How these papers relate**
+that covers: common ground, key differences, and how one could
+build on or complement the other.
+
+If information is not available, write: Not specified in the paper.
+
+Research papers:
+{all_text}
 """
 
     return generate_text(prompt)
 
 
 # ============================================================
-# 12. ASK QUESTIONS ABOUT THE PAPER
+# 11. ASK QUESTIONS ABOUT ONE OR MORE PAPERS
 # ============================================================
 
-def ask_question(question, collection, mode):
-    query_embedding = embedding_model.encode([question])[0]
+def ask_question(question, papers, mode):
+    query_embedding = embedding_model.encode([question])[0].tolist()
 
-    number_of_chunks = collection.count()
+    multi = len(papers) > 1
 
-    if number_of_chunks == 0:
+    per_paper = 5 if not multi else max(2, min(4, 12 // len(papers)))
+
+    chunks = []
+    metadata = []
+    distances = []
+    paper_names = []
+
+    for paper in papers:
+        collection = paper["collection"]
+        count = collection.count()
+
+        if count == 0:
+            continue
+
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=min(per_paper, count),
+            include=["documents", "metadatas", "distances"],
+        )
+
+        for doc, meta, dist in zip(
+            results["documents"][0],
+            results["metadatas"][0],
+            results["distances"][0],
+        ):
+            chunks.append(doc)
+            metadata.append({
+                "page": meta.get("page"),
+                "paper": paper["name"],
+            })
+            distances.append(dist)
+            paper_names.append(paper["name"])
+
+    if not chunks:
         raise ValueError("No indexed paper content was found.")
-
-    results = collection.query(
-        query_embeddings=[query_embedding.tolist()],
-        n_results=min(5, number_of_chunks),
-        include=["documents", "metadatas", "distances"],
-    )
-
-    chunks = results["documents"][0]
-    metadata = results["metadatas"][0]
-    distances = results["distances"][0]
 
     context = "\n\n".join(
         (
             f"SOURCE {i + 1}\n"
+            f"PAPER: {metadata[i]['paper']}\n"
             f"PAGE: {metadata[i].get('page', 'Unknown')}\n\n"
             f"TEXT:\n{chunks[i]}"
         )
         for i in range(len(chunks))
     )
 
+    if multi:
+        names = ", ".join(paper["name"] for paper in papers)
+        scope_rules = f"""
+The user has uploaded {len(papers)} papers: {names}.
+When the question asks to compare or relate the papers, point out
+similarities, differences, and connections between them.
+Always say which paper a statement comes from and mention pages
+like (Paper name, p. 3).
+"""
+    else:
+        scope_rules = (
+            "Mention page numbers like (p. 3) when supported "
+            "by the source."
+        )
+
     prompt = f"""
 You are PaperLens, a research paper question-answering assistant.
 
-Answer using ONLY the retrieved content from the research paper.
+Answer using ONLY the retrieved content from the research paper(s).
 Do NOT use outside knowledge. Do NOT invent information.
-Mention page numbers like (p. 3) when supported by the source.
+{scope_rules}
 
 Answer style:
 {STYLE_INSTRUCTIONS[mode]}
@@ -858,7 +1046,78 @@ Retrieved paper content:
 
 
 # ============================================================
-# 13. SIDEBAR CHAT BUTTON
+# 12. HELPERS: CITATIONS AND SHARING
+# ============================================================
+
+def format_citations(metadata):
+    """Build the 'Source pages' line shown under an answer."""
+    by_paper = {}
+
+    for meta in metadata:
+        page = meta.get("page")
+
+        if page:
+            by_paper.setdefault(meta.get("paper", ""), set()).add(page)
+
+    if not by_paper:
+        return ""
+
+    if len(by_paper) == 1:
+        pages = sorted(next(iter(by_paper.values())))
+        return "Source pages: " + ", ".join(str(p) for p in pages)
+
+    parts = []
+
+    for paper, pages in by_paper.items():
+        page_text = ", ".join(str(p) for p in sorted(pages))
+        parts.append(f"{html.escape(paper)} (p. {page_text})")
+
+    return "Sources: " + " · ".join(parts)
+
+
+def build_share_text(chat):
+    lines = [
+        f"PaperLens - {chat['title']}",
+        "Papers: " + ", ".join(p["name"] for p in chat["papers"]),
+        "",
+    ]
+
+    for item in chat["history"]:
+        lines.append(f"Q: {item['question']}")
+        lines.append(f"A: {item['answer']}")
+        lines.append("")
+
+    return "\n".join(lines).strip()
+
+
+def short_share_text(text, limit=1200):
+    """Share links have URL length limits, so shorten the text."""
+    if len(text) <= limit:
+        return text
+
+    return text[:limit].rstrip() + "...\n(Shortened. Full chat on request.)"
+
+
+def render_user_bubble(text):
+    safe = html.escape(text).replace("\n", "<br>")
+
+    st.markdown(
+        '<div class="pl-user-row">'
+        f'<div class="pl-user-bubble">{safe}</div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def section(label):
+    st.markdown(
+        f'<div class="pl-section">{label}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+# ============================================================
+# 13. SIDEBAR
 # ============================================================
 
 def chat_button(chat_id, prefix):
@@ -866,12 +1125,10 @@ def chat_button(chat_id, prefix):
 
     title = chat["title"]
 
-    if len(title) > 32:
-        title = title[:29] + "..."
+    if len(title) > 30:
+        title = title[:27] + "..."
 
-    is_current = (
-        chat_id == st.session_state.current_chat_id
-    )
+    is_current = chat_id == st.session_state.current_chat_id
 
     if st.button(
         title,
@@ -879,7 +1136,7 @@ def chat_button(chat_id, prefix):
         use_container_width=True,
         type="primary" if is_current else "secondary",
         help=(
-            f"{chat['paper_name']} · "
+            f"{chat['title']} · "
             f"{len(chat['history'])} messages"
         ),
     ):
@@ -887,17 +1144,16 @@ def chat_button(chat_id, prefix):
         st.rerun()
 
 
-# ============================================================
-# 14. SIDEBAR CONTROLS
-# ============================================================
-
 with st.sidebar:
 
-    st.caption("Answer style")
-
-    active_mode = (
-        st.session_state.explanation_mode or "Simple"
+    st.markdown(
+        '<div class="pl-logo">PaperLens</div>',
+        unsafe_allow_html=True,
     )
+
+    section("Answer style")
+
+    active_mode = st.session_state.explanation_mode or "Simple"
 
     mode_cols = st.columns(2)
 
@@ -918,15 +1174,19 @@ with st.sidebar:
 
     st.caption(MODE_HINTS[active_mode])
 
+    st.write("")
+
     if st.button(
-        "＋ New chat",
+        "New chat",
         key="new_chat_btn",
+        icon=":material/add:",
+        type="primary",
         use_container_width=True,
     ):
         new_chat()
         st.rerun()
 
-    # Pinned chats
+    # Favourites
     pinned_ids = [
         chat_id
         for chat_id in st.session_state.pinned
@@ -934,13 +1194,14 @@ with st.sidebar:
     ]
 
     if pinned_ids:
-        st.caption("Pinned")
+        section("Favourites")
 
-        for chat_id in pinned_ids:
-            chat_button(chat_id, "pinned")
+        with st.container(key="chatlist_fav"):
+            for chat_id in pinned_ids:
+                chat_button(chat_id, "pinned")
 
-    # Recent chats
-    st.caption("Recents")
+    # Recents
+    section("Recents")
 
     recent_ids = [
         chat_id
@@ -963,85 +1224,71 @@ with st.sidebar:
             recent_ids = [
                 chat_id
                 for chat_id in recent_ids
-                if (
-                    search
-                    in st.session_state.chats[chat_id]["title"].lower()
-                    or search
-                    in st.session_state.chats[chat_id][
-                        "paper_name"
-                    ].lower()
-                )
+                if search in st.session_state.chats[chat_id]["title"].lower()
             ]
 
     if recent_ids:
-        for chat_id in recent_ids:
-            chat_button(chat_id, "recent")
+        with st.container(key="chatlist_recent"):
+            for chat_id in recent_ids:
+                chat_button(chat_id, "recent")
     else:
         st.caption("No chats yet. Upload a paper to begin.")
 
-    # Current chat actions
+    # Chat actions
     current = get_current_chat()
 
     if current:
-        st.caption("Chat actions")
+        section("Chat actions")
 
-        is_pinned = current["id"] in st.session_state.pinned
+        with st.container(key="chat_actions"):
 
-        st.button(
-            "Unpin chat" if is_pinned else "Pin chat",
-            key="act_pin",
-            on_click=toggle_pin,
-            args=(current["id"],),
-            use_container_width=True,
-        )
-
-        st.button(
-            "Clear messages",
-            key="act_clear",
-            on_click=clear_chat,
-            args=(current["id"],),
-            use_container_width=True,
-        )
-
-        if (
-            st.session_state.confirm_delete
-            == current["id"]
-        ):
-            st.caption("Delete this chat and its messages?")
-
-            yes_col, no_col = st.columns(2)
-
-            with yes_col:
-                if st.button(
-                    "Delete",
-                    key="act_delete_yes",
-                    use_container_width=True,
-                ):
-                    st.session_state.confirm_delete = None
-                    delete_chat(current["id"])
-                    st.rerun()
-
-            with no_col:
-                st.button(
-                    "Cancel",
-                    key="act_delete_no",
-                    on_click=set_confirm_delete,
-                    args=(None,),
-                    use_container_width=True,
-                )
-
-        else:
             st.button(
-                "Delete chat",
-                key="act_delete",
-                on_click=set_confirm_delete,
+                "Clear messages",
+                key="act_clear",
+                icon=":material/ink_eraser:",
+                on_click=clear_chat,
                 args=(current["id"],),
                 use_container_width=True,
             )
 
+            if st.session_state.confirm_delete == current["id"]:
+                st.caption("Delete this chat and its messages?")
+
+                yes_col, no_col = st.columns(2)
+
+                with yes_col:
+                    if st.button(
+                        "Delete",
+                        key="act_delete_yes",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        st.session_state.confirm_delete = None
+                        delete_chat(current["id"])
+                        st.rerun()
+
+                with no_col:
+                    st.button(
+                        "Cancel",
+                        key="act_delete_no",
+                        on_click=set_confirm_delete,
+                        args=(None,),
+                        use_container_width=True,
+                    )
+
+            else:
+                st.button(
+                    "Delete chat",
+                    key="act_delete",
+                    icon=":material/delete:",
+                    on_click=set_confirm_delete,
+                    args=(current["id"],),
+                    use_container_width=True,
+                )
+
 
 # ============================================================
-# 15. MAIN: UPLOAD SCREEN
+# 14. MAIN: UPLOAD SCREEN
 # ============================================================
 
 current_chat = get_current_chat()
@@ -1057,85 +1304,213 @@ if current_chat is None:
 
     st.markdown(
         '<div class="pl-hero-sub">'
-        'Upload a PDF and chat with it. '
+        'Upload one or more PDFs and chat with them. '
+        'Add several papers to compare and relate them. '
         'Answers include references to source pages.'
         '</div>',
         unsafe_allow_html=True,
     )
 
-    uploaded_file = st.file_uploader(
-        "Upload research paper",
+    uploaded_files = st.file_uploader(
+        "Upload research papers",
         type=["pdf"],
+        accept_multiple_files=True,
         key=f"pdf_upload_{st.session_state.upload_key}",
     )
 
-    if uploaded_file:
-        with st.spinner(
-            "Reading and indexing the research paper..."
+    if uploaded_files:
+        count = len(uploaded_files)
+
+        if st.button(
+            f"Start chat with {count} paper{'s' if count != 1 else ''}",
+            key="start_chat",
+            type="primary",
         ):
-            try:
-                file_bytes = uploaded_file.getvalue()
+            started = False
 
-                pages, collection = process_pdf(file_bytes)
+            with st.spinner("Reading and indexing your papers..."):
+                papers, errors = process_uploaded_files(uploaded_files)
 
-                create_chat(
-                    uploaded_file.name,
-                    collection,
-                    pages,
-                )
+            for error in errors:
+                st.error(f"Unable to process {error}")
 
+            if papers:
+                create_chat(papers)
+                started = True
+
+            if started and not errors:
                 st.rerun()
-
-            except Exception as e:
-                st.error(f"Unable to process PDF: {e}")
 
 
 # ============================================================
-# 16. MAIN: CHAT SCREEN
+# 15. MAIN: CHAT SCREEN
 # ============================================================
 
 else:
 
-    pages = current_chat["pages"]
-    collection = current_chat["collection"]
+    papers = current_chat["papers"]
     history = current_chat["history"]
+    multi = len(papers) > 1
 
-    mode = (
-        st.session_state.explanation_mode or "Simple"
-    )
+    mode = st.session_state.explanation_mode or "Simple"
 
-    # Header
+    # One-time notices (e.g. after adding papers)
+    if st.session_state.notice:
+        level, message = st.session_state.notice
+        st.session_state.notice = None
+
+        if level == "error":
+            st.error(message)
+        else:
+            st.success(message)
+
+    # ---- Header ----
+    total_pages = sum(len(p["pages"]) for p in papers)
     total_words = sum(
         len(page["text"].split())
-        for page in pages
+        for paper in papers
+        for page in paper["pages"]
     )
 
-    title_col, summary_col = st.columns([4, 1])
+    paper_label = (
+        f"{len(papers)} papers" if multi else "1 paper"
+    )
 
-    with title_col:
-        st.markdown(
-            (
-                '<p class="pl-title">'
-                f'{html.escape(current_chat["paper_name"])}'
-                '</p>'
-                '<p class="pl-meta">'
-                f'{len(pages)} pages · '
-                f'{total_words:,} words · '
-                f'{mode} answers'
-                '</p>'
-            ),
-            unsafe_allow_html=True,
+    st.markdown(
+        (
+            '<p class="pl-title">'
+            f'{html.escape(current_chat["title"])}'
+            '</p>'
+            '<p class="pl-meta">'
+            f'{paper_label} · {total_pages} pages · '
+            f'{total_words:,} words · {mode} answers'
+            '</p>'
+        ),
+        unsafe_allow_html=True,
+    )
+
+    if multi:
+        st.caption(
+            "Papers in this chat: "
+            + " · ".join(p["name"] for p in papers)
         )
 
-    with summary_col:
+    # ---- Action row: Summarize, Favourite, Share ----
+    is_fav = current_chat["id"] in st.session_state.pinned
+
+    _, sum_col, fav_col, share_col = st.columns([2.2, 1.6, 1.4, 1.1])
+
+    with sum_col:
         st.button(
-            "Summarize paper",
+            "Summarize papers" if multi else "Summarize paper",
             key="top_summary",
             on_click=ask_summary,
+            args=(multi,),
             use_container_width=True,
         )
 
-    # Empty state and suggestions
+    with fav_col:
+        st.button(
+            "Favourited" if is_fav else "Favourite",
+            key="top_fav",
+            icon=":material/star:",
+            on_click=toggle_pin,
+            args=(current_chat["id"],),
+            type="primary" if is_fav else "secondary",
+            use_container_width=True,
+        )
+
+    with share_col:
+        with st.popover(
+            "Share",
+            icon=":material/share:",
+            use_container_width=True,
+        ):
+            if not history:
+                st.caption(
+                    "Ask a question first, then share the conversation."
+                )
+            else:
+                full_text = build_share_text(current_chat)
+                short_text = short_share_text(full_text)
+                encoded = quote(short_text)
+                subject = quote(f"PaperLens: {current_chat['title']}")
+
+                st.link_button(
+                    "WhatsApp",
+                    f"https://wa.me/?text={encoded}",
+                    use_container_width=True,
+                )
+
+                st.link_button(
+                    "Telegram",
+                    f"https://t.me/share/url?url=%20&text={encoded}",
+                    use_container_width=True,
+                )
+
+                st.link_button(
+                    "Email",
+                    f"mailto:?subject={subject}&body={encoded}",
+                    use_container_width=True,
+                )
+
+                safe_name = re.sub(
+                    r"[^A-Za-z0-9_-]+", "_", current_chat["title"]
+                ).strip("_") or "paperlens_chat"
+
+                st.download_button(
+                    "Download as text file",
+                    data=full_text,
+                    file_name=f"{safe_name}.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+
+                st.caption("Copy the full conversation:")
+                st.code(full_text, language=None)
+
+    # ---- Add more papers ----
+    with st.expander("Add more papers to compare"):
+        extra_files = st.file_uploader(
+            "Add PDFs",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key=f"add_upload_{st.session_state.add_key}",
+            label_visibility="collapsed",
+        )
+
+        if extra_files:
+            if st.button(
+                f"Add {len(extra_files)} paper"
+                f"{'s' if len(extra_files) != 1 else ''} to this chat",
+                key="add_papers_btn",
+                type="primary",
+            ):
+                with st.spinner("Reading and indexing..."):
+                    new_papers, errors = process_uploaded_files(
+                        extra_files
+                    )
+
+                added = add_papers_to_chat(current_chat, new_papers)
+
+                st.session_state.add_key += 1
+
+                if errors:
+                    st.session_state.notice = (
+                        "error",
+                        "Could not add: " + "; ".join(errors),
+                    )
+                else:
+                    st.session_state.notice = (
+                        "success",
+                        f"Added {added} paper"
+                        f"{'s' if added != 1 else ''}. "
+                        "You can now ask questions across all papers.",
+                    )
+
+                st.rerun()
+
+    # ---- Empty state and suggestions ----
     pending = st.session_state.pending
 
     if not history and not pending:
@@ -1148,11 +1523,18 @@ else:
             unsafe_allow_html=True,
         )
 
-        suggestions = [
-            "What problem does this paper solve?",
-            "Explain the method step by step.",
-            "What are the main results and limitations?",
-        ]
+        if multi:
+            suggestions = [
+                "How are these papers related?",
+                "Compare the methods used in these papers.",
+                "What are the key differences in their results?",
+            ]
+        else:
+            suggestions = [
+                "What problem does this paper solve?",
+                "Explain the method step by step.",
+                "What are the main results and limitations?",
+            ]
 
         for i, suggestion in enumerate(suggestions):
             st.button(
@@ -1163,36 +1545,23 @@ else:
                 use_container_width=True,
             )
 
-    # Render chat history
+    # ---- Chat history: questions right, answers left ----
     for item in history:
 
-        with st.chat_message("user"):
-            st.write(item["question"])
+        render_user_bubble(item["question"])
 
-        with st.chat_message("assistant"):
+        with st.container(border=True):
             st.markdown(item["answer"])
 
             metadata = item.get("metadata", [])
             chunks = item.get("chunks", [])
             distances = item.get("distances", [])
 
-            cited_pages = sorted({
-                meta.get("page")
-                for meta in metadata
-                if meta.get("page")
-            })
+            citation_line = format_citations(metadata)
 
-            if cited_pages:
-                page_text = ", ".join(
-                    str(page) for page in cited_pages
-                )
-
+            if citation_line:
                 st.markdown(
-                    (
-                        '<div class="pl-cites">'
-                        f'Source pages: {page_text}'
-                        '</div>'
-                    ),
+                    f'<div class="pl-cites">{citation_line}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -1201,11 +1570,9 @@ else:
                     f"Sources ({len(chunks)} passages)"
                 ):
                     for i, chunk in enumerate(chunks):
-                        page_number = (
-                            metadata[i].get("page", "?")
-                            if i < len(metadata)
-                            else "?"
-                        )
+                        meta = metadata[i] if i < len(metadata) else {}
+                        page_number = meta.get("page", "?")
+                        paper_name = meta.get("paper", "")
 
                         distance = (
                             distances[i]
@@ -1213,85 +1580,114 @@ else:
                             else None
                         )
 
-                        if distance is not None:
-                            st.markdown(
-                                f"**Page {page_number}** "
-                                f"· distance {distance:.3f}"
-                            )
-                        else:
-                            st.markdown(
-                                f"**Page {page_number}**"
-                            )
+                        label = f"**Page {page_number}**"
 
+                        if multi and paper_name:
+                            label = f"**{paper_name}** · page {page_number}"
+
+                        if distance is not None:
+                            label += f" · distance {distance:.3f}"
+
+                        st.markdown(label)
                         st.caption(chunk)
 
-    # Process pending question or summary
+    # ---- Process pending question or summary ----
     if pending:
 
-        with st.chat_message("user"):
-            st.write(pending["question"])
+        render_user_bubble(pending["question"])
 
-        with st.chat_message("assistant"):
+        failed = False
+        result = None
 
+        with st.container(border=True):
             with st.spinner(
-                "Reading the paper and generating your answer..."
+                "Reading the papers and generating your answer..."
             ):
-
                 try:
                     if pending["kind"] == "summary":
-
-                        answer = generate_summary(pages)
-
-                        chunks = []
-                        metadata = []
-                        distances = []
-
+                        result = (
+                            generate_summary(papers),
+                            [],
+                            [],
+                            [],
+                        )
                     else:
-
-                        (
-                            answer,
-                            chunks,
-                            metadata,
-                            distances,
-                        ) = ask_question(
+                        result = ask_question(
                             pending["question"],
-                            collection,
+                            papers,
                             mode,
                         )
 
-                    history.append({
-                        "question": pending["question"],
-                        "answer": answer,
-                        "chunks": chunks,
-                        "metadata": metadata,
-                        "distances": distances,
-                    })
-
-                    move_to_top(current_chat["id"])
-
-                    st.session_state.pending = None
-
-                    st.rerun()
-
                 except Exception as e:
-
-                    st.session_state.pending = None
+                    failed = True
 
                     if isinstance(e, QuotaExceeded):
                         st.warning(friendly_error(e))
                     else:
                         st.error(friendly_error(e))
 
-    # Chat input
-    question = st.chat_input(
-        "Ask about this paper..."
-    )
+        if failed:
+            st.session_state.pending = None
 
-    if question and question.strip():
+        elif result is not None:
+            answer, chunks, metadata, distances = result
 
-        st.session_state.pending = {
-            "kind": "question",
-            "question": question.strip(),
-        }
+            history.append({
+                "question": pending["question"],
+                "answer": answer,
+                "chunks": chunks,
+                "metadata": metadata,
+                "distances": distances,
+            })
+
+            move_to_top(current_chat["id"])
+
+            st.session_state.pending = None
+
+            st.rerun()
+
+    # ---- Chat input (with multi-PDF attach when supported) ----
+    try:
+        submitted = st.chat_input(
+            "Ask about your papers, or attach PDFs to add them...",
+            accept_file="multiple",
+            file_type=["pdf"],
+        )
+    except TypeError:
+        # Older Streamlit versions: text only.
+        submitted = st.chat_input("Ask about your papers...")
+
+    if submitted:
+
+        if isinstance(submitted, str):
+            text = submitted
+            attached = []
+        else:
+            text = getattr(submitted, "text", "") or ""
+            attached = list(getattr(submitted, "files", []) or [])
+
+        if attached:
+            with st.spinner("Reading and indexing attached papers..."):
+                new_papers, errors = process_uploaded_files(attached)
+
+            added = add_papers_to_chat(current_chat, new_papers)
+
+            if errors:
+                st.session_state.notice = (
+                    "error",
+                    "Could not add: " + "; ".join(errors),
+                )
+            elif added:
+                st.session_state.notice = (
+                    "success",
+                    f"Added {added} paper{'s' if added != 1 else ''} "
+                    "to this chat.",
+                )
+
+        if text.strip():
+            st.session_state.pending = {
+                "kind": "question",
+                "question": text.strip(),
+            }
 
         st.rerun()
