@@ -1,12 +1,14 @@
+
 import html
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
 import hashlib
 from io import BytesIO
+from datetime import datetime, timedelta, timezone
 
 import streamlit as st
 import chromadb
+from groq import Groq
 from google import genai
 from pypdf import PdfReader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -14,26 +16,33 @@ from sentence_transformers import SentenceTransformer
 
 
 # ============================================================
-# PAGE CONFIG
+# 1. PAGE CONFIGURATION
 # ============================================================
 
 st.set_page_config(
     page_title="PaperLens",
-    page_icon=None,
+    page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 PRIMARY_MODEL = "gemini-3-flash-preview"
 
-# If the main model hits its daily free quota, the next one is tried automatically.
-# (Gemini free-tier quotas are counted separately for each model.)
-FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"]
+GEMINI_FALLBACK_MODELS = [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+]
 
-# Time zone used when telling the user when the limit resets (India Standard Time).
+PREFERRED_GROQ_MODELS = [
+    "openai/gpt-oss-20b",
+    "openai/gpt-oss-120b",
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+]
+
 DISPLAY_TZ = timezone(timedelta(hours=5, minutes=30), "IST")
-MODES = ["Simple", "Technical"]
 
+MODES = ["Simple", "Technical"]
 
 MODE_HINTS = {
     "Simple": "Plain, beginner-friendly answers.",
@@ -42,140 +51,119 @@ MODE_HINTS = {
 
 STYLE_INSTRUCTIONS = {
     "Simple": (
-        "Explain the answer in simple English. Use beginner-friendly language "
-        "and avoid unnecessary technical terminology."
+        "Explain the answer in simple English. Use beginner-friendly "
+        "language and avoid unnecessary technical terminology."
     ),
     "Technical": (
-        "Give a technical and detailed explanation. Use appropriate research "
-        "and computer science terminology."
+        "Give a technical and detailed explanation. Use appropriate "
+        "research and computer science terminology."
     ),
 }
 
 
 # ============================================================
-# STYLING
+# 2. STYLING
 # ============================================================
 
 st.markdown(
     """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Newsreader:wght@400;600&family=Public+Sans:wght@400;500;600;700&display=swap');
 
-.stApp {font-family: 'Public Sans', system-ui, sans-serif;}
-footer, #MainMenu {display: none;}
-header[data-testid="stHeader"] {background: transparent;}
-/* Hide only the right-hand toolbar items (share, star, edit, GitHub, menu).
-   The left side holds the button that reopens the sidebar, so it must stay visible. */
-[data-testid="stToolbarActions"], [data-testid="stMainMenu"], [data-testid="stAppDeployButton"],
-[data-testid="stDecoration"], [data-testid="stStatusWidget"] {display: none !important;}
-[data-testid="stExpandSidebarButton"], [data-testid="collapsedControl"],
-[data-testid="stSidebarCollapseButton"] {display: flex !important; visibility: visible !important;}
-
-/* Centered reading column for the chat */
-.block-container {max-width: 880px; padding-top: 2rem; padding-bottom: 6rem;}
-
-/* ---------- Sidebar ---------- */
-.pl-logo-name {font: 600 1.45rem 'Newsreader', Georgia, serif; line-height: 1.1; margin: 0 0 .3rem 0;}
-
-/* Recent chats: flat rows, title + small subtitle, accent bar on the open chat */
-[data-testid="stSidebar"] [class*="st-key-recent_"] button,
-[data-testid="stSidebar"] [class*="st-key-pinned_"] button {
-    background: transparent; border: none; border-radius: 8px;
-    justify-content: flex-start; text-align: left; font-weight: 500;
-    padding: .5rem .75rem; min-height: 0; box-shadow: none;
+.stApp {
+    font-family: 'Public Sans', system-ui, sans-serif;
 }
-[data-testid="stSidebar"] [class*="st-key-recent_"] button:hover,
-[data-testid="stSidebar"] [class*="st-key-pinned_"] button:hover {background: rgba(47,93,138,.08);}
-[data-testid="stSidebar"] [class*="st-key-recent_"] [data-testid="stBaseButton-primary"],
-[data-testid="stSidebar"] [class*="st-key-pinned_"] [data-testid="stBaseButton-primary"] {
-    background: #E6EEF7; color: #1B2430; box-shadow: inset 3px 0 0 #2F5D8A;
+
+footer, #MainMenu {
+    display: none;
 }
-.st-key-new_chat_btn button {
-    background: #2F5D8A !important; color: #fff !important; border: none !important;
-    justify-content: center !important; font-weight: 600; border-radius: 9px;
+
+header[data-testid="stHeader"] {
+    background: transparent;
 }
-.st-key-new_chat_btn button:hover {background: #254B72 !important;}
 
-
-/* ---------- Sidebar spacing ---------- */
-[data-testid="stSidebarHeader"] {height: auto; padding: .6rem 1rem 0 1rem;}
-[data-testid="stSidebarUserContent"] {padding-top: .3rem;}
-[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {gap: .6rem;}
-
-/* Left-align text inside sidebar buttons */
-[data-testid="stSidebar"] .stButton button > div {justify-content: flex-start; width: 100%;}
-[data-testid="stSidebar"] .stButton button p {text-align: left;}
-.st-key-new_chat_btn button > div {justify-content: center !important;}
-
-/* Chat actions: flat rows */
-[class*="st-key-act_"] button {
-    background: transparent; border: none; box-shadow: none; border-radius: 8px;
-    padding: .4rem .75rem; min-height: 0; font-weight: 500; justify-content: flex-start;
+.block-container {
+    max-width: 900px;
+    padding-top: 2rem;
+    padding-bottom: 5rem;
 }
-[class*="st-key-act_"] button:hover {background: rgba(47,93,138,.08);}
-.st-key-act_delete button, .st-key-act_delete_yes button {color: #B3382C;}
-.st-key-act_delete button:hover {background: rgba(179,56,44,.08);}
-.st-key-act_delete_yes button, .st-key-act_delete_no button {
-    justify-content: center !important; border: 1px solid #D5DDE6 !important;
-}
-.st-key-act_delete_yes button > div, .st-key-act_delete_no button > div {justify-content: center !important;}
 
-/* ---------- Answer style buttons ---------- */
-[class*="st-key-mode_"] [data-testid="stBaseButton-primary"] {
-    background: #2F5D8A !important; border: 1px solid #2F5D8A !important; color: #fff !important;
+.pl-logo {
+    font: 600 1.7rem 'Newsreader', Georgia, serif;
+    margin-bottom: .8rem;
 }
-[class*="st-key-mode_"] [data-testid="stBaseButton-primary"] p {color: #fff !important;}
-[class*="st-key-mode_"] [data-testid="stBaseButton-secondary"] {
-    background: #fff !important; border: 1px solid #D5DDE6 !important; color: #1B2430 !important;
+
+.pl-title {
+    font: 600 1.65rem 'Newsreader', Georgia, serif;
+    line-height: 1.3;
 }
-[class*="st-key-mode_"] [data-testid="stBaseButton-secondary"]:hover {border-color: #2F5D8A !important; color: #2F5D8A !important;}
-[class*="st-key-mode_"] button > div {justify-content: center !important;}
-[class*="st-key-mode_"] button p {text-align: center !important;}
 
-/* ---------- Blue accent (replaces Streamlit's default red) ---------- */
-[data-testid="stBaseButton-segmented_controlActive"],
-[data-testid="stSegmentedControl"] button[aria-checked="true"],
-[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
-    background: #2F5D8A !important; border-color: #2F5D8A !important; color: #fff !important;
+.pl-meta {
+    color: #66758a;
+    font-size: .85rem;
 }
-[data-testid="stBaseButton-segmented_controlActive"] p,
-[data-testid="stBaseButton-segmented_controlActive"] span,
-[data-testid="stSegmentedControl"] button[aria-checked="true"] p,
-[data-testid="stSegmentedControl"] button[aria-pressed="true"] p {color: #fff !important;}
-[data-testid="stBaseButton-segmented_control"]:hover {border-color: #2F5D8A; color: #2F5D8A;}
-[data-testid="stChatInput"]:focus-within {border-color: #2F5D8A !important; box-shadow: 0 0 0 1px #2F5D8A;}
-[data-testid="stTextInput"] input:focus {border-color: #2F5D8A !important; box-shadow: 0 0 0 1px #2F5D8A !important;}
 
-/* ---------- Header ---------- */
-.pl-title {font: 600 1.55rem 'Newsreader', Georgia, serif; margin: 0; line-height: 1.25;}
-.pl-meta {color: #66758a; font-size: .85rem; margin: .2rem 0 .8rem 0;}
+.pl-hero-title {
+    font: 600 2.8rem 'Newsreader', Georgia, serif;
+    line-height: 1.15;
+    margin: 2rem 0 .6rem 0;
+}
 
-/* ---------- Chat ---------- */
-[data-testid="stChatMessageAvatarUser"], [data-testid="stChatMessageAvatarAssistant"] {display: none;}
+.pl-hero-sub {
+    color: #66758a;
+    font-size: 1.05rem;
+    margin-bottom: 1.5rem;
+}
+
+.pl-empty {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem 1rem;
+}
+
+.pl-empty b {
+    font: 600 1.5rem 'Newsreader', Georgia, serif;
+}
+
+.pl-empty span {
+    display: block;
+    color: #66758a;
+    margin-top: .4rem;
+}
+
+.pl-cites {
+    color: #66758a;
+    font-size: .82rem;
+    margin-top: .5rem;
+}
+
 [data-testid="stChatMessage"] {
-    width: fit-content; max-width: 88%; border-radius: 16px; padding: .8rem 1.1rem;
-    background: #F4F7FA; border: 1px solid #E3E9F0; margin-right: auto;
+    border-radius: 14px;
+    border: 1px solid #E3E9F0;
 }
-/* Questions: right side */
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {
-    margin-left: auto; margin-right: 0; max-width: 72%;
-    background: #E1ECF7; border-color: #C9DCEF; border-bottom-right-radius: 4px;
-}
-/* Answers: left side */
-[data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarAssistant"]) {
-    border-bottom-left-radius: 4px; background: #FFFFFF; border-color: #DDE5EE;
-}
-.pl-cites {color: #66758a; font-size: .82rem; margin-top: .4rem;}
-.pl-empty {text-align: center; padding: 3rem 1rem 1rem 1rem;}
-.pl-empty b {font: 600 1.5rem 'Newsreader', Georgia, serif;}
-.pl-empty span {display: block; color: #66758a; margin-top: .3rem;}
 
-/* ---------- Upload screen ---------- */
-.pl-hero-title {font: 600 2.8rem 'Newsreader', Georgia, serif; line-height: 1.12; margin: 2rem 0 .5rem 0;}
-.pl-hero-sub {font-size: 1.05rem; color: #66758a; margin-bottom: 1.4rem;}
-[data-testid="stFileUploaderDropzone"] {
-    border: 2px dashed #9DB6CF; border-radius: 16px; padding: 2rem 1.2rem; background: #F7FAFD;
+[data-testid="stChatInput"]:focus-within {
+    border-color: #2F5D8A !important;
 }
+
+[data-testid="stFileUploaderDropzone"] {
+    border: 2px dashed #9DB6CF;
+    border-radius: 16px;
+    padding: 1.5rem;
+    background: #F7FAFD;
+}
+
+[data-testid="stSidebar"] {
+    background: #F7F9FC;
+}
+
+[data-testid="stSidebar"] button {
+    border-radius: 8px;
+}
+
+.stButton button {
+    transition: all .15s ease;
+}
+
 </style>
 """,
     unsafe_allow_html=True,
@@ -183,7 +171,7 @@ header[data-testid="stHeader"] {background: transparent;}
 
 
 # ============================================================
-# SESSION STATE
+# 3. SESSION STATE
 # ============================================================
 
 defaults = {
@@ -203,21 +191,105 @@ for key, value in defaults.items():
 
 
 # ============================================================
-# GEMINI CLIENT
+# 4. API CLIENTS
+#     PRIORITY: GROQ -> GEMINI
 # ============================================================
 
+groq_client = None
+groq_model = None
+client = None
+
+
+def get_secret(name, default=""):
+    """Safely retrieve a value from Streamlit Secrets."""
+    try:
+        return st.secrets.get(name, default)
+    except Exception:
+        return default
+
+
+# Initialize Groq first
 try:
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-except Exception:
+    groq_key = get_secret("GROQ_API_KEY")
+
+    if groq_key:
+        groq_client = Groq(api_key=groq_key)
+
+        # Check the models available to this API key.
+        available_models = groq_client.models.list()
+        available_ids = [
+            model.id for model in available_models.data
+        ]
+
+        for candidate in PREFERRED_GROQ_MODELS:
+            if candidate in available_ids:
+                groq_model = candidate
+                break
+
+        # If none of the preferred IDs is available, try other
+        # compatible model families listed by the account.
+        if groq_model is None:
+            for model_id in available_ids:
+                if any(
+                    name in model_id.lower()
+                    for name in ["llama", "gpt-oss", "qwen"]
+                ):
+                    groq_model = model_id
+                    break
+
+except Exception as e:
+    groq_client = None
+    groq_model = None
+    print("Groq initialization failed:", str(e)[:300])
+
+
+# Initialize Gemini as the fallback
+try:
+    gemini_key = get_secret("GEMINI_API_KEY")
+
+    if gemini_key:
+        client = genai.Client(api_key=gemini_key)
+
+except Exception as e:
+    client = None
+    print("Gemini initialization failed:", str(e)[:300])
+
+
+# ============================================================
+# 5. MODEL STATUS
+# ============================================================
+
+with st.sidebar:
+    st.markdown(
+        '<div class="pl-logo">📚 PaperLens</div>',
+        unsafe_allow_html=True,
+    )
+
+    if groq_client is not None and groq_model:
+        st.success("Primary AI: Groq")
+        st.caption(f"Groq model: {groq_model}")
+    else:
+        st.warning("Groq is unavailable. Gemini will be tried first.")
+
+    if client is not None:
+        st.caption("Backup AI: Gemini")
+        st.caption(f"Gemini model: {PRIMARY_MODEL}")
+    else:
+        st.warning("Gemini backup is not configured.")
+
+
+if not (
+    groq_client is not None and groq_model is not None
+) and client is None:
     st.error(
-        "Gemini API key is not configured. "
-        "Please add GEMINI_API_KEY in Streamlit Secrets."
+        "No AI provider is available. Add GROQ_API_KEY and/or "
+        "GEMINI_API_KEY in Streamlit Secrets."
     )
     st.stop()
 
 
 # ============================================================
-# MODELS
+# 6. EMBEDDING MODEL AND CHROMADB
 # ============================================================
 
 @st.cache_resource
@@ -235,27 +307,40 @@ chroma_client = load_chroma_client()
 
 
 # ============================================================
-# PDF PROCESSING
+# 7. PDF PROCESSING
 # ============================================================
 
 def extract_pdf_pages(file_bytes):
+    """Extract text from each PDF page."""
     reader = PdfReader(BytesIO(file_bytes))
     pages = []
 
     for page_number, page in enumerate(reader.pages, start=1):
         text = (page.extract_text() or "").strip()
+
         if text:
-            pages.append({"page": page_number, "text": text})
+            pages.append({
+                "page": page_number,
+                "text": text,
+            })
 
     return pages
 
 
 def create_chunks(pages):
-    splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    chunks, page_numbers = [], []
+    """Split the paper into overlapping text chunks."""
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=200,
+    )
+
+    chunks = []
+    page_numbers = []
 
     for page_data in pages:
-        for chunk in splitter.split_text(page_data["text"]):
+        page_chunks = splitter.split_text(page_data["text"])
+
+        for chunk in page_chunks:
             chunks.append(chunk)
             page_numbers.append(page_data["page"])
 
@@ -263,37 +348,54 @@ def create_chunks(pages):
 
 
 def create_collection_name(file_bytes):
-    return f"research_paper_{hashlib.md5(file_bytes).hexdigest()[:10]}"
+    """Create a stable collection name for the PDF."""
+    digest = hashlib.md5(file_bytes).hexdigest()[:10]
+    return f"research_paper_{digest}"
 
 
 def process_pdf(file_bytes):
+    """Extract, embed, and index the uploaded PDF."""
     pages = extract_pdf_pages(file_bytes)
+
     if not pages:
-        raise ValueError("No readable text was found in this PDF.")
+        raise ValueError(
+            "No readable text was found in this PDF. "
+            "Scanned PDFs may require OCR."
+        )
 
     chunks, page_numbers = create_chunks(pages)
+
     if not chunks:
         raise ValueError("No text chunks were created.")
 
-    embeddings = embedding_model.encode(chunks, show_progress_bar=False)
+    collection_name = create_collection_name(file_bytes)
 
     collection = chroma_client.get_or_create_collection(
-        name=create_collection_name(file_bytes)
+        name=collection_name
     )
 
+    # Index the PDF only if its collection is empty.
     if collection.count() == 0:
+        embeddings = embedding_model.encode(
+            chunks,
+            show_progress_bar=False,
+        )
+
         collection.add(
             ids=[f"chunk_{i}" for i in range(len(chunks))],
             documents=chunks,
             embeddings=embeddings.tolist(),
-            metadatas=[{"page": p} for p in page_numbers],
+            metadatas=[
+                {"page": page}
+                for page in page_numbers
+            ],
         )
 
     return pages, collection
 
 
 # ============================================================
-# CHAT MANAGEMENT
+# 8. CHAT MANAGEMENT
 # ============================================================
 
 def create_chat(paper_name, collection, pages):
@@ -311,17 +413,23 @@ def create_chat(paper_name, collection, pages):
     st.session_state.recents.insert(0, chat_id)
     st.session_state.current_chat_id = chat_id
     st.session_state.pending = None
+
     return chat_id
 
 
 def get_current_chat():
     chat_id = st.session_state.current_chat_id
-    return st.session_state.chats.get(chat_id) if chat_id else None
+
+    if chat_id:
+        return st.session_state.chats.get(chat_id)
+
+    return None
 
 
 def move_to_top(chat_id):
     if chat_id in st.session_state.recents:
         st.session_state.recents.remove(chat_id)
+
     st.session_state.recents.insert(0, chat_id)
 
 
@@ -344,6 +452,7 @@ def delete_chat(chat_id):
 
     if chat_id in st.session_state.recents:
         st.session_state.recents.remove(chat_id)
+
     if chat_id in st.session_state.pinned:
         st.session_state.pinned.remove(chat_id)
 
@@ -361,6 +470,7 @@ def set_confirm_delete(chat_id):
 
 def clear_chat(chat_id):
     chat = st.session_state.chats.get(chat_id)
+
     if chat:
         chat["history"] = []
 
@@ -373,21 +483,32 @@ def toggle_pin(chat_id):
 
 
 def ask_suggestion(question):
-    st.session_state.pending = {"kind": "question", "question": question}
+    st.session_state.pending = {
+        "kind": "question",
+        "question": question,
+    }
 
 
 def ask_summary():
-    st.session_state.pending = {"kind": "summary", "question": "Summarize this paper."}
+    st.session_state.pending = {
+        "kind": "summary",
+        "question": "Summarize this paper.",
+    }
 
 
 # ============================================================
-# AI FUNCTIONS
+# 9. AI ERROR HANDLING
 # ============================================================
 
 class QuotaExceeded(Exception):
-    """Raised when no model could answer because of quota limits or availability."""
+    """Raised when Gemini models are exhausted or unavailable."""
 
-    def __init__(self, quota_models, unavailable_models, retry_seconds=None):
+    def __init__(
+        self,
+        quota_models,
+        unavailable_models,
+        retry_seconds=None,
+    ):
         super().__init__("Gemini quota exceeded")
         self.quota_models = quota_models
         self.unavailable_models = unavailable_models
@@ -395,62 +516,42 @@ class QuotaExceeded(Exception):
 
 
 def parse_retry_seconds(message):
-    """Read how long Google says to wait from a 429 error message."""
-    match = re.search(r"retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s", message)
+    """Extract a retry delay from a model API error."""
+    match = re.search(
+        r"retryDelay['\"]?\s*:\s*['\"]?(\d+(?:\.\d+)?)s",
+        message,
+    )
+
     if match:
         return float(match.group(1))
 
     match = re.search(
-        r"retry in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:(\d+(?:\.\d+)?)s)?", message
+        r"retry in\s+(?:(\d+)h)?\s*(?:(\d+)m)?\s*"
+        r"(?:(\d+(?:\.\d+)?)s)?",
+        message,
     )
+
     if match and any(match.groups()):
         hours, minutes, seconds = match.groups()
-        return int(hours or 0) * 3600 + int(minutes or 0) * 60 + float(seconds or 0)
+
+        return (
+            int(hours or 0) * 3600
+            + int(minutes or 0) * 60
+            + float(seconds or 0)
+        )
 
     return None
 
 
 def get_model_candidates():
-    try:
-        primary = st.secrets.get("GEMINI_MODEL", PRIMARY_MODEL)
-    except Exception:
-        primary = PRIMARY_MODEL
+    """Return the Gemini model order."""
+    primary = get_secret("GEMINI_MODEL", PRIMARY_MODEL)
 
-    models = [primary] + [m for m in FALLBACK_MODELS if m != primary]
-    return models
-
-
-def generate_text(prompt):
-    """Call Gemini, moving to the next model if one is out of quota or unavailable."""
-    quota_models = []
-    unavailable_models = []
-    retry_delays = []
-
-    for model in get_model_candidates():
-        try:
-            response = client.models.generate_content(model=model, contents=prompt)
-            return response.text or "The model returned an empty answer. Please try again."
-        except Exception as e:
-            message = str(e)
-
-            if "429" in message or "RESOURCE_EXHAUSTED" in message:
-                quota_models.append(model)
-                delay = parse_retry_seconds(message)
-                if delay is not None:
-                    retry_delays.append(delay)
-                continue
-
-            if any(code in message for code in ("404", "NOT_FOUND", "503", "UNAVAILABLE")):
-                unavailable_models.append(model)
-                continue
-
-            raise
-
-    raise QuotaExceeded(
-        quota_models,
-        unavailable_models,
-        min(retry_delays) if retry_delays else None,
-    )
+    return [primary] + [
+        model
+        for model in GEMINI_FALLBACK_MODELS
+        if model != primary
+    ]
 
 
 def format_wait(seconds):
@@ -459,10 +560,17 @@ def format_wait(seconds):
     minutes = remainder // 60
 
     parts = []
+
     if hours:
-        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        parts.append(
+            f"{hours} hour{'s' if hours != 1 else ''}"
+        )
+
     if minutes:
-        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
+        parts.append(
+            f"{minutes} minute{'s' if minutes != 1 else ''}"
+        )
+
     if not parts:
         parts.append(f"{max(seconds, 1)} seconds")
 
@@ -475,36 +583,194 @@ def friendly_error(error):
 
         if seconds is None:
             return (
-                "You have reached your daily limit. "
-                "You can use PaperLens again after midnight Pacific time."
+                "The available Gemini models could not answer. "
+                "Check your quota, model access, and API settings."
             )
 
         if seconds < 3600:
             return (
-                "You have reached the request limit. "
+                "The request limit has been reached. "
                 f"Please try again in about {format_wait(seconds)}."
             )
 
-        reset = datetime.now(timezone.utc) + timedelta(seconds=seconds)
+        reset = datetime.now(timezone.utc) + timedelta(
+            seconds=seconds
+        )
         local = reset.astimezone(DISPLAY_TZ)
+
         clock = local.strftime("%I:%M %p").lstrip("0")
         day = f"{local.day} {local.strftime('%b')}"
 
         return (
-            "You have reached your daily limit. "
-            f"You can use PaperLens again after {clock} {DISPLAY_TZ.tzname(None)} on {day} "
-            f"(in about {format_wait(seconds)})."
+            "The request limit has been reached. "
+            f"Try again after {clock} IST on {day} "
+            f"(about {format_wait(seconds)})."
         )
 
-    text = str(error)
-    if len(text) > 300:
-        text = text[:300] + "..."
-    return f"Something went wrong while contacting the model: {text}"
+    message = str(error)
 
+    if len(message) > 500:
+        message = message[:500] + "..."
+
+    return f"Something went wrong: {message}"
+
+
+# ============================================================
+# 10. GENERATE TEXT: GROQ FIRST, GEMINI BACKUP
+# ============================================================
+
+def generate_text(prompt):
+    """
+    Attempt Groq first.
+    If Groq fails, try Gemini models in sequence.
+    """
+
+    groq_error = None
+
+    # --------------------------------------------------------
+    # FIRST: GROQ
+    # --------------------------------------------------------
+    if groq_client is not None and groq_model is not None:
+        try:
+            response = groq_client.chat.completions.create(
+                model=groq_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are PaperLens, a research paper "
+                            "explainer assistant. Answer using the "
+                            "provided research paper content. "
+                            "Do not invent facts or use unsupported "
+                            "claims about the paper."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    },
+                ],
+                temperature=0.2,
+                max_tokens=1800,
+            )
+
+            answer = response.choices[0].message.content
+
+            if answer and answer.strip():
+                return (
+                    answer.strip()
+                    + f"\n\n*AI model: Groq ({groq_model})*"
+                )
+
+            raise RuntimeError("Groq returned an empty answer.")
+
+        except Exception as e:
+            groq_error = str(e)
+
+            print(
+                "Groq failed. Switching to Gemini:",
+                groq_error[:300],
+            )
+
+    # --------------------------------------------------------
+    # SECOND: GEMINI
+    # --------------------------------------------------------
+    quota_models = []
+    unavailable_models = []
+    retry_delays = []
+    gemini_errors = []
+
+    if client is not None:
+        for model in get_model_candidates():
+            try:
+                response = client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                )
+
+                answer = getattr(response, "text", None)
+
+                if answer and answer.strip():
+                    return (
+                        answer.strip()
+                        + f"\n\n*AI model: Gemini ({model})*"
+                    )
+
+                gemini_errors.append(
+                    f"{model}: empty response"
+                )
+
+            except Exception as e:
+                message = str(e)
+
+                print(
+                    f"Gemini model {model} failed:",
+                    message[:250],
+                )
+
+                if (
+                    "429" in message
+                    or "RESOURCE_EXHAUSTED" in message
+                ):
+                    quota_models.append(model)
+
+                    delay = parse_retry_seconds(message)
+
+                    if delay is not None:
+                        retry_delays.append(delay)
+
+                elif any(
+                    code in message
+                    for code in (
+                        "404",
+                        "NOT_FOUND",
+                        "503",
+                        "UNAVAILABLE",
+                    )
+                ):
+                    unavailable_models.append(model)
+
+                else:
+                    gemini_errors.append(
+                        f"{model}: {message[:200]}"
+                    )
+
+    # --------------------------------------------------------
+    # BOTH PROVIDERS FAILED
+    # --------------------------------------------------------
+    if quota_models or unavailable_models:
+        raise QuotaExceeded(
+            quota_models,
+            unavailable_models,
+            min(retry_delays) if retry_delays else None,
+        )
+
+    details = []
+
+    if groq_error:
+        details.append(
+            f"Groq error: {groq_error[:250]}"
+        )
+
+    details.extend(gemini_errors)
+
+    if client is None:
+        details.append("Gemini is not configured.")
+
+    raise RuntimeError(
+        "No AI provider could generate an answer. "
+        + " | ".join(details)
+    )
+
+
+# ============================================================
+# 11. GENERATE A PAPER SUMMARY
+# ============================================================
 
 def generate_summary(pages):
     paper_text = "\n\n".join(
-        f"PAGE {p['page']}\n{p['text']}" for p in pages
+        f"PAGE {page['page']}\n{page['text']}"
+        for page in pages
     )[:60000]
 
     prompt = f"""
@@ -513,8 +779,8 @@ You are a research paper analysis assistant.
 Analyze ONLY the research paper provided below.
 Do not use outside knowledge. Do not invent information.
 
-Write the answer in Markdown using EXACTLY these sections, each as a bold
-heading followed by 1 to 3 short sentences or bullets:
+Write the answer in Markdown using these sections.
+Give 1 to 3 short sentences or bullets for each section.
 
 **Research objective**
 **Problem statement**
@@ -531,15 +797,26 @@ Not specified in the paper.
 Research paper:
 {paper_text}
 """
+
     return generate_text(prompt)
 
+
+# ============================================================
+# 12. ASK QUESTIONS ABOUT THE PAPER
+# ============================================================
 
 def ask_question(question, collection, mode):
     query_embedding = embedding_model.encode([question])[0]
 
+    number_of_chunks = collection.count()
+
+    if number_of_chunks == 0:
+        raise ValueError("No indexed paper content was found.")
+
     results = collection.query(
         query_embeddings=[query_embedding.tolist()],
-        n_results=min(5, max(collection.count(), 1)),
+        n_results=min(5, number_of_chunks),
+        include=["documents", "metadatas", "distances"],
     )
 
     chunks = results["documents"][0]
@@ -547,7 +824,11 @@ def ask_question(question, collection, mode):
     distances = results["distances"][0]
 
     context = "\n\n".join(
-        f"SOURCE {i + 1}\nPAGE: {metadata[i].get('page', 'Unknown')}\n\nTEXT:\n{chunks[i]}"
+        (
+            f"SOURCE {i + 1}\n"
+            f"PAGE: {metadata[i].get('page', 'Unknown')}\n\n"
+            f"TEXT:\n{chunks[i]}"
+        )
         for i in range(len(chunks))
     )
 
@@ -556,11 +837,12 @@ You are PaperLens, a research paper question-answering assistant.
 
 Answer using ONLY the retrieved content from the research paper.
 Do NOT use outside knowledge. Do NOT invent information.
-Mention page numbers like (p. 3) when you use a source.
+Mention page numbers like (p. 3) when supported by the source.
 
+Answer style:
 {STYLE_INSTRUCTIONS[mode]}
 
-If the answer cannot be found in the retrieved paper content, say exactly:
+If the answer cannot be found in the retrieved paper content, say:
 The information is not available in the research paper.
 
 User question:
@@ -570,40 +852,55 @@ Retrieved paper content:
 {context}
 """
 
-    return generate_text(prompt), chunks, metadata, distances
+    answer = generate_text(prompt)
+
+    return answer, chunks, metadata, distances
 
 
 # ============================================================
-# SIDEBAR
+# 13. SIDEBAR CHAT BUTTON
 # ============================================================
 
 def chat_button(chat_id, prefix):
     chat = st.session_state.chats[chat_id]
+
     title = chat["title"]
+
     if len(title) > 32:
         title = title[:29] + "..."
 
-    is_current = chat_id == st.session_state.current_chat_id
+    is_current = (
+        chat_id == st.session_state.current_chat_id
+    )
 
     if st.button(
         title,
         key=f"{prefix}_{chat_id}",
         use_container_width=True,
         type="primary" if is_current else "secondary",
-        help=f"{chat['paper_name']} · {len(chat['history'])} messages",
+        help=(
+            f"{chat['paper_name']} · "
+            f"{len(chat['history'])} messages"
+        ),
     ):
         open_chat(chat_id)
         st.rerun()
 
 
-with st.sidebar:
-    st.markdown('<div class="pl-logo-name">PaperLens</div>', unsafe_allow_html=True)
+# ============================================================
+# 14. SIDEBAR CONTROLS
+# ============================================================
 
-    # Answer style, at the top
+with st.sidebar:
+
     st.caption("Answer style")
-    active_mode = st.session_state.explanation_mode or "Simple"
+
+    active_mode = (
+        st.session_state.explanation_mode or "Simple"
+    )
 
     mode_cols = st.columns(2)
+
     for col, mode_name in zip(mode_cols, MODES):
         with col:
             st.button(
@@ -612,29 +909,46 @@ with st.sidebar:
                 on_click=set_mode,
                 args=(mode_name,),
                 use_container_width=True,
-                type="primary" if mode_name == active_mode else "secondary",
+                type=(
+                    "primary"
+                    if mode_name == active_mode
+                    else "secondary"
+                ),
             )
 
     st.caption(MODE_HINTS[active_mode])
 
-    if st.button("New chat", key="new_chat_btn", use_container_width=True):
+    if st.button(
+        "＋ New chat",
+        key="new_chat_btn",
+        use_container_width=True,
+    ):
         new_chat()
         st.rerun()
 
-    # Pinned
-    pinned_ids = [c for c in st.session_state.pinned if c in st.session_state.chats]
+    # Pinned chats
+    pinned_ids = [
+        chat_id
+        for chat_id in st.session_state.pinned
+        if chat_id in st.session_state.chats
+    ]
+
     if pinned_ids:
         st.caption("Pinned")
+
         for chat_id in pinned_ids:
             chat_button(chat_id, "pinned")
 
-    # Recents / history
+    # Recent chats
     st.caption("Recents")
 
     recent_ids = [
-        c
-        for c in st.session_state.recents
-        if c in st.session_state.chats and c not in st.session_state.pinned
+        chat_id
+        for chat_id in st.session_state.recents
+        if (
+            chat_id in st.session_state.chats
+            and chat_id not in st.session_state.pinned
+        )
     ]
 
     if len(recent_ids) > 4:
@@ -644,12 +958,19 @@ with st.sidebar:
             label_visibility="collapsed",
             key="chat_search",
         ).strip().lower()
+
         if search:
             recent_ids = [
-                c
-                for c in recent_ids
-                if search in st.session_state.chats[c]["title"].lower()
-                or search in st.session_state.chats[c]["paper_name"].lower()
+                chat_id
+                for chat_id in recent_ids
+                if (
+                    search
+                    in st.session_state.chats[chat_id]["title"].lower()
+                    or search
+                    in st.session_state.chats[chat_id][
+                        "paper_name"
+                    ].lower()
+                )
             ]
 
     if recent_ids:
@@ -658,8 +979,9 @@ with st.sidebar:
     else:
         st.caption("No chats yet. Upload a paper to begin.")
 
-    # Options for the open chat
+    # Current chat actions
     current = get_current_chat()
+
     if current:
         st.caption("Chat actions")
 
@@ -668,26 +990,33 @@ with st.sidebar:
         st.button(
             "Unpin chat" if is_pinned else "Pin chat",
             key="act_pin",
-            icon=":material/push_pin:",
             on_click=toggle_pin,
             args=(current["id"],),
             use_container_width=True,
         )
+
         st.button(
             "Clear messages",
             key="act_clear",
-            icon=":material/ink_eraser:",
             on_click=clear_chat,
             args=(current["id"],),
             use_container_width=True,
         )
 
-        if st.session_state.confirm_delete == current["id"]:
+        if (
+            st.session_state.confirm_delete
+            == current["id"]
+        ):
             st.caption("Delete this chat and its messages?")
+
             yes_col, no_col = st.columns(2)
 
             with yes_col:
-                if st.button("Delete", key="act_delete_yes", use_container_width=True):
+                if st.button(
+                    "Delete",
+                    key="act_delete_yes",
+                    use_container_width=True,
+                ):
                     st.session_state.confirm_delete = None
                     delete_chat(current["id"])
                     st.rerun()
@@ -700,11 +1029,11 @@ with st.sidebar:
                     args=(None,),
                     use_container_width=True,
                 )
+
         else:
             st.button(
                 "Delete chat",
                 key="act_delete",
-                icon=":material/delete:",
                 on_click=set_confirm_delete,
                 args=(current["id"],),
                 use_container_width=True,
@@ -712,19 +1041,25 @@ with st.sidebar:
 
 
 # ============================================================
-# MAIN: UPLOAD SCREEN
+# 15. MAIN: UPLOAD SCREEN
 # ============================================================
 
 current_chat = get_current_chat()
 
 if current_chat is None:
+
     st.markdown(
-        '<div class="pl-hero-title">Ask questions about any research paper.</div>',
+        '<div class="pl-hero-title">'
+        'Ask questions about any research paper.'
+        '</div>',
         unsafe_allow_html=True,
     )
+
     st.markdown(
-        '<div class="pl-hero-sub">Upload a PDF and chat with it. '
-        "Every answer points to the pages it came from.</div>",
+        '<div class="pl-hero-sub">'
+        'Upload a PDF and chat with it. '
+        'Answers include references to source pages.'
+        '</div>',
         unsafe_allow_html=True,
     )
 
@@ -732,38 +1067,63 @@ if current_chat is None:
         "Upload research paper",
         type=["pdf"],
         key=f"pdf_upload_{st.session_state.upload_key}",
-        label_visibility="collapsed",
     )
 
     if uploaded_file:
-        with st.spinner("Reading and indexing the paper..."):
+        with st.spinner(
+            "Reading and indexing the research paper..."
+        ):
             try:
-                pages, collection = process_pdf(uploaded_file.getvalue())
-                create_chat(uploaded_file.name, collection, pages)
+                file_bytes = uploaded_file.getvalue()
+
+                pages, collection = process_pdf(file_bytes)
+
+                create_chat(
+                    uploaded_file.name,
+                    collection,
+                    pages,
+                )
+
                 st.rerun()
+
             except Exception as e:
                 st.error(f"Unable to process PDF: {e}")
 
 
 # ============================================================
-# MAIN: CHAT
+# 16. MAIN: CHAT SCREEN
 # ============================================================
 
 else:
+
     pages = current_chat["pages"]
     collection = current_chat["collection"]
     history = current_chat["history"]
-    mode = st.session_state.explanation_mode or "Simple"
 
-    # ---------------- Header ----------------
+    mode = (
+        st.session_state.explanation_mode or "Simple"
+    )
 
-    total_words = sum(len(p["text"].split()) for p in pages)
+    # Header
+    total_words = sum(
+        len(page["text"].split())
+        for page in pages
+    )
+
     title_col, summary_col = st.columns([4, 1])
 
     with title_col:
         st.markdown(
-            f'<p class="pl-title">{html.escape(current_chat["paper_name"])}</p>'
-            f'<p class="pl-meta">{len(pages)} pages · {total_words:,} words · {mode} answers</p>',
+            (
+                '<p class="pl-title">'
+                f'{html.escape(current_chat["paper_name"])}'
+                '</p>'
+                '<p class="pl-meta">'
+                f'{len(pages)} pages · '
+                f'{total_words:,} words · '
+                f'{mode} answers'
+                '</p>'
+            ),
             unsafe_allow_html=True,
         )
 
@@ -775,24 +1135,26 @@ else:
             use_container_width=True,
         )
 
-    # ---------------- Empty state ----------------
-
+    # Empty state and suggestions
     pending = st.session_state.pending
 
     if not history and not pending:
+
         st.markdown(
-            '<div class="pl-empty"><b>What would you like to know?</b>'
-            "<span>Ask a question below, or try one of these.</span></div>",
+            '<div class="pl-empty">'
+            '<b>What would you like to know?</b>'
+            '<span>Ask a question below, or try one of these.</span>'
+            '</div>',
             unsafe_allow_html=True,
         )
 
-        for i, suggestion in enumerate(
-            [
-                "What problem does this paper solve?",
-                "Explain the method step by step.",
-                "What are the main results and limitations?",
-            ]
-        ):
+        suggestions = [
+            "What problem does this paper solve?",
+            "Explain the method step by step.",
+            "What are the main results and limitations?",
+        ]
+
+        for i, suggestion in enumerate(suggestions):
             st.button(
                 suggestion,
                 key=f"suggest_{i}",
@@ -801,77 +1163,135 @@ else:
                 use_container_width=True,
             )
 
-    # ---------------- History ----------------
-
+    # Render chat history
     for item in history:
+
         with st.chat_message("user"):
             st.write(item["question"])
 
         with st.chat_message("assistant"):
-            st.write(item["answer"])
+            st.markdown(item["answer"])
 
             metadata = item.get("metadata", [])
             chunks = item.get("chunks", [])
             distances = item.get("distances", [])
 
-            cited = sorted({m.get("page") for m in metadata if m.get("page")})
-            if cited:
+            cited_pages = sorted({
+                meta.get("page")
+                for meta in metadata
+                if meta.get("page")
+            })
+
+            if cited_pages:
+                page_text = ", ".join(
+                    str(page) for page in cited_pages
+                )
+
                 st.markdown(
-                    f'<div class="pl-cites">Pages: {", ".join(str(p) for p in cited)}</div>',
+                    (
+                        '<div class="pl-cites">'
+                        f'Source pages: {page_text}'
+                        '</div>'
+                    ),
                     unsafe_allow_html=True,
                 )
 
             if chunks:
-                with st.expander(f"Sources ({len(chunks)} passages)"):
+                with st.expander(
+                    f"Sources ({len(chunks)} passages)"
+                ):
                     for i, chunk in enumerate(chunks):
-                        st.markdown(
-                            f"**Page {metadata[i].get('page', '?')}**"
-                            f" · distance {distances[i]:.3f}"
+                        page_number = (
+                            metadata[i].get("page", "?")
+                            if i < len(metadata)
+                            else "?"
                         )
+
+                        distance = (
+                            distances[i]
+                            if i < len(distances)
+                            else None
+                        )
+
+                        if distance is not None:
+                            st.markdown(
+                                f"**Page {page_number}** "
+                                f"· distance {distance:.3f}"
+                            )
+                        else:
+                            st.markdown(
+                                f"**Page {page_number}**"
+                            )
+
                         st.caption(chunk)
 
-    # ---------------- Pending request ----------------
-
+    # Process pending question or summary
     if pending:
+
         with st.chat_message("user"):
             st.write(pending["question"])
 
         with st.chat_message("assistant"):
-            with st.spinner("Reading the paper..."):
+
+            with st.spinner(
+                "Reading the paper and generating your answer..."
+            ):
+
                 try:
                     if pending["kind"] == "summary":
+
                         answer = generate_summary(pages)
-                        chunks, metadata, distances = [], [], []
+
+                        chunks = []
+                        metadata = []
+                        distances = []
+
                     else:
-                        answer, chunks, metadata, distances = ask_question(
-                            pending["question"], collection, mode
+
+                        (
+                            answer,
+                            chunks,
+                            metadata,
+                            distances,
+                        ) = ask_question(
+                            pending["question"],
+                            collection,
+                            mode,
                         )
 
-                    history.append(
-                        {
-                            "question": pending["question"],
-                            "answer": answer,
-                            "chunks": chunks,
-                            "metadata": metadata,
-                            "distances": distances,
-                        }
-                    )
+                    history.append({
+                        "question": pending["question"],
+                        "answer": answer,
+                        "chunks": chunks,
+                        "metadata": metadata,
+                        "distances": distances,
+                    })
 
                     move_to_top(current_chat["id"])
+
                     st.session_state.pending = None
+
                     st.rerun()
 
                 except Exception as e:
+
                     st.session_state.pending = None
+
                     if isinstance(e, QuotaExceeded):
                         st.warning(friendly_error(e))
                     else:
                         st.error(friendly_error(e))
 
-    # ---------------- Chat input ----------------
-
-    question = st.chat_input("Ask about this paper...")
+    # Chat input
+    question = st.chat_input(
+        "Ask about this paper..."
+    )
 
     if question and question.strip():
-        st.session_state.pending = {"kind": "question", "question": question.strip()}
+
+        st.session_state.pending = {
+            "kind": "question",
+            "question": question.strip(),
+        }
+
         st.rerun()
