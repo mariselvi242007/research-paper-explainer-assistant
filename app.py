@@ -26,20 +26,24 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+BLUE = "#2F5D8A"
+LIGHT_BLUE = "#E1ECF7"
+
 PRIMARY_MODEL = "gemini-3-flash-preview"
 
-FALLBACK_MODELS = [
+GEMINI_FALLBACK_MODELS = [
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
 ]
 
-GROQ_MODELS = [
+GROQ_FALLBACK_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
     "openai/gpt-oss-20b",
 ]
 
 DISPLAY_TZ = timezone(timedelta(hours=5, minutes=30), "IST")
+
 MODES = ["Simple", "Technical"]
 
 MODE_HINTS = {
@@ -53,14 +57,14 @@ STYLE_INSTRUCTIONS = {
         "language and avoid unnecessary technical terminology."
     ),
     "Technical": (
-        "Give a technical and detailed explanation. Use appropriate "
+        "Give a detailed technical explanation using appropriate "
         "research and computer science terminology."
     ),
 }
 
 
 # ============================================================
-# STYLING — ORIGINAL DESIGN PRESERVED
+# CSS — PAPERLENS UI + BLUE CHAT INPUT AND SEND ICON
 # ============================================================
 
 st.markdown(
@@ -68,27 +72,23 @@ st.markdown(
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap');
 
-.stApp {font-family: 'Public Sans', system-ui, sans-serif;}
-footer, #MainMenu {display: none;}
-header[data-testid="stHeader"] {background: transparent;}
-
-/* Preserve the sidebar reopen/collapse controls */
-[data-testid="stToolbarActions"],
-[data-testid="stMainMenu"],
-[data-testid="stAppDeployButton"],
-[data-testid="stDecoration"],
-[data-testid="stStatusWidget"] {
-    display: none !important;
+:root {
+    --pl-blue: #2F5D8A;
+    --pl-light-blue: #E1ECF7;
 }
 
-[data-testid="stExpandSidebarButton"],
-[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapseButton"] {
-    display: flex !important;
-    visibility: visible !important;
+.stApp {
+    font-family: 'Public Sans', system-ui, sans-serif;
 }
 
-/* Centered chat */
+footer, #MainMenu {
+    display: none;
+}
+
+header[data-testid="stHeader"] {
+    background: transparent;
+}
+
 .block-container {
     max-width: 880px;
     padding-top: 2rem;
@@ -129,7 +129,7 @@ header[data-testid="stHeader"] {background: transparent;}
 
 .st-key-new_chat_btn button {
     background: #2F5D8A !important;
-    color: #fff !important;
+    color: white !important;
     border: none !important;
     justify-content: center !important;
     font-weight: 600;
@@ -166,6 +166,7 @@ header[data-testid="stHeader"] {background: transparent;}
     justify-content: center !important;
 }
 
+/* Chat actions */
 [class*="st-key-act_"] button {
     background: transparent;
     border: none;
@@ -196,12 +197,7 @@ header[data-testid="stHeader"] {background: transparent;}
     border: 1px solid #D5DDE6 !important;
 }
 
-.st-key-act_delete_yes button > div,
-.st-key-act_delete_no button > div {
-    justify-content: center !important;
-}
-
-/* Answer modes */
+/* Mode buttons */
 [class*="st-key-mode_"] [data-testid="stBaseButton-primary"] {
     background: #2F5D8A !important;
     border: 1px solid #2F5D8A !important;
@@ -231,38 +227,73 @@ header[data-testid="stHeader"] {background: transparent;}
     text-align: center !important;
 }
 
-/* Blue accents */
-[data-testid="stBaseButton-segmented_controlActive"],
-[data-testid="stSegmentedControl"] button[aria-checked="true"],
-[data-testid="stSegmentedControl"] button[aria-pressed="true"] {
-    background: #2F5D8A !important;
-    border-color: #2F5D8A !important;
-    color: #fff !important;
-}
-
-[data-testid="stBaseButton-segmented_controlActive"] p,
-[data-testid="stBaseButton-segmented_controlActive"] span,
-[data-testid="stSegmentedControl"] button[aria-checked="true"] p,
-[data-testid="stSegmentedControl"] button[aria-pressed="true"] p {
-    color: #fff !important;
-}
-
-[data-testid="stBaseButton-segmented_control"]:hover {
-    border-color: #2F5D8A;
-    color: #2F5D8A;
-}
-
-[data-testid="stChatInput"]:focus-within {
-    border-color: #2F5D8A !important;
-    box-shadow: 0 0 0 1px #2F5D8A;
-}
-
+/* General focused text fields */
 [data-testid="stTextInput"] input:focus {
     border-color: #2F5D8A !important;
     box-shadow: 0 0 0 1px #2F5D8A !important;
 }
 
-/* Header */
+/* ========================================================
+   CHAT TYPING BAR — BLUE BORDER WHEN TYPING
+   ======================================================== */
+
+/* Keep the chat input visible */
+[data-testid="stChatInput"] {
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+/* Change the chat input border to blue on focus */
+[data-testid="stChatInput"]:focus-within {
+    border-color: #2F5D8A !important;
+    box-shadow: 0 0 0 1px #2F5D8A !important;
+}
+
+/* Streamlit versions may use a form or textarea container */
+[data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] textarea,
+[data-testid="stChatInput"] [data-baseweb="base-input"] {
+    caret-color: #2F5D8A !important;
+}
+
+/* Blue send button */
+[data-testid="stChatInput"] button {
+    color: #2F5D8A !important;
+    background-color: transparent !important;
+    border-color: transparent !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+/* Blue send icon, including SVG-based icons */
+[data-testid="stChatInput"] button svg,
+[data-testid="stChatInput"] button svg path,
+[data-testid="stChatInput"] button svg line,
+[data-testid="stChatInput"] button svg polyline {
+    color: #2F5D8A !important;
+    stroke: #2F5D8A !important;
+}
+
+/* Hover effect */
+[data-testid="stChatInput"] button:hover {
+    background-color: #E1ECF7 !important;
+    color: #2F5D8A !important;
+    border-radius: 8px;
+}
+
+/* Also target Streamlit's form-submit button if the DOM differs */
+[data-testid="stChatInputSubmitButton"] {
+    color: #2F5D8A !important;
+    background-color: transparent !important;
+}
+
+[data-testid="stChatInputSubmitButton"] svg,
+[data-testid="stChatInputSubmitButton"] svg path {
+    color: #2F5D8A !important;
+    stroke: #2F5D8A !important;
+}
+
+/* Paper title */
 .pl-title {
     font: 600 1.55rem 'Newsreader', Georgia, serif;
     margin: 0;
@@ -306,12 +337,14 @@ header[data-testid="stHeader"] {background: transparent;}
     border-color: #DDE5EE;
 }
 
+/* Citations */
 .pl-cites {
     color: #66758a;
     font-size: .82rem;
     margin-top: .4rem;
 }
 
+/* Empty chat */
 .pl-empty {
     text-align: center;
     padding: 3rem 1rem 1rem 1rem;
@@ -327,7 +360,7 @@ header[data-testid="stHeader"] {background: transparent;}
     margin-top: .3rem;
 }
 
-/* Upload screen */
+/* PDF upload screen */
 .pl-hero-title {
     font: 600 2.8rem 'Newsreader', Georgia, serif;
     line-height: 1.12;
@@ -345,17 +378,6 @@ header[data-testid="stHeader"] {background: transparent;}
     border-radius: 16px;
     padding: 2rem 1.2rem;
     background: #F7FAFD;
-}
-
-/* Keep the standard chat input and send arrow visible */
-[data-testid="stChatInput"] {
-    visibility: visible !important;
-    opacity: 1 !important;
-}
-
-[data-testid="stChatInput"] button {
-    visibility: visible !important;
-    opacity: 1 !important;
 }
 </style>
 """,
@@ -385,7 +407,7 @@ for key, value in defaults.items():
 
 
 # ============================================================
-# AI CLIENTS
+# API KEYS AND CLIENTS
 # ============================================================
 
 def get_secret(name, default=""):
@@ -416,13 +438,13 @@ if GEMINI_API_KEY:
 if groq_client is None and gemini_client is None:
     st.error(
         "No AI provider is configured. Add GROQ_API_KEY or "
-        "GEMINI_API_KEY to Streamlit Secrets."
+        "GEMINI_API_KEY to .streamlit/secrets.toml."
     )
     st.stop()
 
 
 # ============================================================
-# EMBEDDINGS AND CHROMA
+# EMBEDDING MODEL AND VECTOR DATABASE
 # ============================================================
 
 @st.cache_resource
@@ -478,7 +500,7 @@ def create_chunks(pages):
 
 def create_collection_name(file_bytes):
     digest = hashlib.md5(file_bytes).hexdigest()[:10]
-    return f"research_paper_{digest}"
+    return f"paper_{digest}"
 
 
 def process_pdf(file_bytes):
@@ -486,8 +508,8 @@ def process_pdf(file_bytes):
 
     if not pages:
         raise ValueError(
-            "No readable text was found in the PDF. "
-            "Scanned PDFs may need OCR."
+            "No readable text was found in this PDF. "
+            "If it is scanned, OCR may be required."
         )
 
     chunks, page_numbers = create_chunks(pages)
@@ -616,7 +638,7 @@ def ask_summary():
 
 
 # ============================================================
-# AI PROVIDER FALLBACK
+# GROQ FIRST, GEMINI FALLBACK
 # ============================================================
 
 class QuotaExceeded(Exception):
@@ -660,20 +682,23 @@ def parse_retry_seconds(message):
     return None
 
 
-def get_gemini_models():
-    primary = get_secret("GEMINI_MODEL", PRIMARY_MODEL)
+def get_groq_models():
+    primary = get_secret(
+        "GROQ_MODEL",
+        GROQ_FALLBACK_MODELS[0],
+    )
 
     return [primary] + [
-        model for model in FALLBACK_MODELS
+        model for model in GROQ_FALLBACK_MODELS
         if model != primary
     ]
 
 
-def get_groq_models():
-    primary = get_secret("GROQ_MODEL", GROQ_MODELS[0])
+def get_gemini_models():
+    primary = get_secret("GEMINI_MODEL", PRIMARY_MODEL)
 
     return [primary] + [
-        model for model in GROQ_MODELS
+        model for model in GEMINI_FALLBACK_MODELS
         if model != primary
     ]
 
@@ -709,7 +734,7 @@ def generate_text(prompt):
     retry_delays = []
     other_errors = []
 
-    # 1. Try Groq models first
+    # First: Groq
     if groq_client is not None:
         for model in get_groq_models():
             try:
@@ -720,8 +745,7 @@ def generate_text(prompt):
                             "role": "system",
                             "content": (
                                 "You are PaperLens, a research paper "
-                                "analysis assistant. Follow the supplied "
-                                "instructions and do not invent facts."
+                                "analysis assistant. Do not invent facts."
                             ),
                         },
                         {
@@ -737,9 +761,7 @@ def generate_text(prompt):
                 if answer and answer.strip():
                     return answer.strip()
 
-                other_errors.append(
-                    f"Groq {model}: empty response"
-                )
+                other_errors.append(f"Groq {model}: empty response")
 
             except Exception as e:
                 message = str(e)
@@ -759,7 +781,7 @@ def generate_text(prompt):
                         f"Groq {model}: {message[:180]}"
                     )
 
-    # 2. Try Gemini and its fallback models
+    # Second: Gemini
     if gemini_client is not None:
         for model in get_gemini_models():
             try:
@@ -773,9 +795,7 @@ def generate_text(prompt):
                 if answer and answer.strip():
                     return answer.strip()
 
-                other_errors.append(
-                    f"Gemini {model}: empty response"
-                )
+                other_errors.append(f"Gemini {model}: empty response")
 
             except Exception as e:
                 message = str(e)
@@ -795,7 +815,6 @@ def generate_text(prompt):
                         f"Gemini {model}: {message[:180]}"
                     )
 
-    # 3. No provider succeeded
     if quota_models and not other_errors:
         raise QuotaExceeded(
             quota_models,
@@ -806,9 +825,7 @@ def generate_text(prompt):
     details = []
 
     if quota_models:
-        details.append(
-            "Rate limits: " + ", ".join(quota_models)
-        )
+        details.append("Rate limits: " + ", ".join(quota_models))
 
     if unavailable_models:
         details.append(
@@ -816,7 +833,7 @@ def generate_text(prompt):
         )
 
     if other_errors:
-        details.append("\n".join(other_errors[:4]))
+        details.extend(other_errors[:4])
 
     raise RuntimeError(
         "No configured AI model could answer the request.\n"
@@ -853,7 +870,7 @@ def friendly_error(error):
 
         if seconds is not None and seconds < 3600:
             return (
-                "AI request limit reached. Please try again in about "
+                "AI request limit reached. Try again in about "
                 f"{format_wait(seconds)}."
             )
 
@@ -883,7 +900,7 @@ def friendly_error(error):
 
 
 # ============================================================
-# SUMMARY
+# PAPER SUMMARY
 # ============================================================
 
 def generate_summary(pages):
@@ -895,10 +912,9 @@ def generate_summary(pages):
     prompt = f"""
 You are a research paper analysis assistant.
 
-Analyze ONLY the research paper provided below.
-Do not use outside knowledge. Do not invent information.
+Analyze only the paper supplied below. Do not invent facts.
 
-Write the answer in Markdown using EXACTLY these sections:
+Use these Markdown sections:
 
 **Research objective**
 **Problem statement**
@@ -909,10 +925,8 @@ Write the answer in Markdown using EXACTLY these sections:
 **Limitations**
 **Conclusion**
 
-Each heading should have 1 to 3 short sentences or bullets.
-
-If information is unavailable, write:
-Not specified in the paper.
+Give 1–3 short sentences or bullets per section.
+If something is not mentioned, say "Not specified in the paper".
 
 Research paper:
 {paper_text}
@@ -922,7 +936,7 @@ Research paper:
 
 
 # ============================================================
-# QUESTION ANSWERING
+# RETRIEVAL-AUGMENTED QUESTION ANSWERING
 # ============================================================
 
 def ask_question(question, collection, mode):
@@ -943,30 +957,28 @@ def ask_question(question, collection, mode):
     distances = results["distances"][0]
 
     context = "\n\n".join(
-        (
-            f"SOURCE {i + 1}\n"
-            f"PAGE: {metadata[i].get('page', 'Unknown')}\n"
-            f"TEXT:\n{chunks[i]}"
-        )
+        f"SOURCE {i + 1}\n"
+        f"PAGE: {metadata[i].get('page', 'Unknown')}\n"
+        f"TEXT:\n{chunks[i]}"
         for i in range(len(chunks))
     )
 
     prompt = f"""
 You are PaperLens, a research paper question-answering assistant.
 
-Answer using ONLY the retrieved content from the paper.
-Do not use outside knowledge. Do not invent information.
+Answer using only the retrieved passages from the paper.
+Do not invent information or rely on outside knowledge.
 Mention page numbers like (p. 3) when possible.
 
 {STYLE_INSTRUCTIONS[mode]}
 
 If the answer cannot be found in the retrieved content, say:
-The information is not available in the research paper.
+"The information is not available in the research paper."
 
 User question:
 {question}
 
-Retrieved paper content:
+Retrieved paper passages:
 {context}
 """
 
@@ -1006,8 +1018,8 @@ with st.sidebar:
     )
 
     st.caption("Answer style")
-
     active_mode = st.session_state.explanation_mode or "Simple"
+
     mode_cols = st.columns(2)
 
     for col, mode_name in zip(mode_cols, MODES):
@@ -1143,7 +1155,7 @@ with st.sidebar:
 
 
 # ============================================================
-# MAIN: UPLOAD SCREEN
+# MAIN: PDF UPLOAD
 # ============================================================
 
 current_chat = get_current_chat()
@@ -1200,7 +1212,7 @@ if current_chat is None:
 
 
 # ============================================================
-# MAIN: CHAT
+# MAIN: CHAT WINDOW
 # ============================================================
 
 else:
@@ -1260,7 +1272,7 @@ else:
                 use_container_width=True,
             )
 
-    # Display previous messages
+    # Show chat history
     for item in history:
         with st.chat_message("user"):
             st.write(item["question"])
@@ -1287,13 +1299,11 @@ else:
                 )
 
             if chunks:
-                with st.expander(
-                    f"Sources ({len(chunks)} passages)"
-                ):
+                with st.expander(f"Sources ({len(chunks)} passages)"):
                     for i, chunk in enumerate(chunks):
                         page_no = metadata[i].get("page", "?")
-                        distance_text = ""
 
+                        distance_text = ""
                         if i < len(distances):
                             distance_text = (
                                 f" · distance {distances[i]:.3f}"
@@ -1304,7 +1314,7 @@ else:
                         )
                         st.caption(chunk)
 
-    # Process pending question or summary before showing input.
+    # Handle pending question or summary
     if pending:
         with st.chat_message("user"):
             st.write(pending["question"])
@@ -1347,10 +1357,7 @@ else:
                     else:
                         st.error(friendly_error(e))
 
-    # ========================================================
-    # CHAT INPUT — NORMAL SEND ARROW
-    # ========================================================
-
+    # Standard Streamlit input — keeps the send arrow
     question = st.chat_input(
         "Ask about this paper...",
         key="paperlens_chat_input",
