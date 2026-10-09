@@ -1,147 +1,166 @@
-# PaperLens — Research Paper Explainer Assistant
+#  PaperLens — Research Paper Explainer Assistant
 
 **Team Name:** Smart Work
 
+PaperLens is a Generative AI-powered research paper assistant that enables users to upload research papers in PDF format and interact with them through natural-language questions.
+
+The system uses **Retrieval-Augmented Generation (RAG)** to retrieve relevant passages from an uploaded paper and generate context-based answers. It also displays page-level source references and retrieved passages so users can verify the information.
+
+PaperLens supports beginner-friendly and technical explanations, automatic research paper summarization, and multiple paper conversations through a Streamlit web interface.
+
 ## Team Members
 
-| S. No. | Name              | Register Number |
-| ------ | ----------------- | --------------- |
-| 1      | M. Mariselvi      | 99230041094     |
-| 2      | S. Kavya          | 99230041093     |
-| 3      | Sampathi Yaswanth | 99230041039     |
-| 4      | C. Manasa         | 99230041047     |
-| 5      | M. Ganesh         | 99230041020     |
-
-
-PaperLens is a Generative AI-powered research paper assistant that allows users to upload a research paper in PDF format and interact with it through natural-language questions.
-
-The system uses Retrieval-Augmented Generation (RAG) to retrieve relevant sections from the uploaded paper and generate answers using Google Gemini. It also provides page-level source evidence so users can verify where an answer comes from.
+| S. No. | Name | Register Number |
+|---|---|---|
+| 1 | M. Mariselvi | 99230041094 |
+| 2 | S. Kavya | 99230041093 |
+| 3 | Sampathi Yaswanth | 99230041039 |
+| 4 | C. Manasa | 99230041047 |
+| 5 | M. Ganesh | 99230041020 |
 
 ## Features
 
-* Upload research papers in PDF format
-* Extract text from research papers page by page
-* Split documents into meaningful text chunks
-* Generate semantic embeddings using Sentence Transformers
-* Store and retrieve document chunks using ChromaDB
-* Ask natural-language questions about the paper
-* Retrieval-Augmented Generation (RAG)
-* Google Gemini-powered answers
-* Simple explanation mode for beginners
-* Technical explanation mode for detailed answers
-* Automatic research paper summary
-* Page-level source references
-* Display retrieved source passages
-* Multiple research-paper conversations
-* Recent chats
-* Pinned chats
-* Gemini model fallback handling for quota limits
+- Upload research papers in PDF format
+- Extract text page by page using `pypdf`
+- Split documents into overlapping text chunks
+- Generate semantic embeddings using Sentence Transformers
+- Store and retrieve document chunks using ChromaDB
+- Ask natural-language questions about research papers
+- Retrieve relevant content using semantic similarity
+- Generate answers using Retrieval-Augmented Generation (RAG)
+- Use Groq as the primary AI provider when configured
+- Automatically fall back to Google Gemini when Groq fails
+- Support Simple and Technical explanation modes
+- Generate structured research paper summaries
+- Display source page numbers and retrieved passages
+- Manage multiple research paper conversations
+- View recent chats, pin chats, clear messages, and delete chats
+- Handle AI provider errors and model quota limitations
 
 ## System Architecture
 
 ```text
-                    Research Paper PDF
-                           │
-                           ▼
-                  PDF Text Extraction
-                           │
-                           ▼
-                  Page-aware Chunking
-                           │
-                           ▼
-                Sentence Transformer
-                     Embeddings
-                           │
-                           ▼
-                      ChromaDB
+                 Research Paper PDF
+                         |
+                         v
+                 PDF Text Extraction
+                         |
+                         v
+                 Page-aware Chunking
+                         |
+                         v
+               Sentence Transformer
+                   Embeddings
+                         |
+                         v
+                     ChromaDB
                   Vector Database
-                           │
-             ┌─────────────┴─────────────┐
-             │                           │
-        User Question              Paper Summary
-             │                           │
-             ▼                           ▼
-      Question Embedding          Gemini Analysis
-             │
-             ▼
-       Similarity Search
-             │
-             ▼
-      Relevant Paper Chunks
-             │
-             ▼
-        Gemini RAG Model
-             │
-             ▼
-      Answer + Page Sources
+                         |
+                 +-------+-------+
+                 |               |
+                 v               v
+           User Question     Paper Summary
+                 |               |
+                 v               v
+         Question Embedding   Paper Text
+                 |
+                 v
+          Semantic Retrieval
+                 |
+                 v
+         Relevant Paper Chunks
+                 |
+                 v
+           Groq AI Provider
+                 |
+          If Groq fails
+                 |
+                 v
+          Google Gemini
+          Fallback Provider
+                 |
+                 v
+          Generated Answer
+                 |
+                 v
+       Answer + Source Pages
 ```
+
+**Note:** Groq is the preferred provider when a supported model is available. Gemini is used as a fallback. If Groq is not configured, PaperLens can use Gemini directly.
 
 ## How PaperLens Works
 
 ### 1. PDF Upload
 
-The user uploads a research paper in PDF format.
+The user uploads a research paper through the Streamlit interface.
 
 ### 2. Text Extraction
 
-PaperLens extracts readable text from every page using `pypdf`.
+`pypdf` extracts readable text from individual PDF pages. The original page numbers are retained for source references.
 
 ### 3. Text Chunking
 
-The extracted content is divided into smaller overlapping chunks using LangChain's `RecursiveCharacterTextSplitter`.
+The extracted text is split into smaller, overlapping chunks using LangChain's `RecursiveCharacterTextSplitter`.
 
 Current configuration:
 
-```text
-Chunk size: 1000
-Chunk overlap: 200
-```
+| Parameter | Value |
+|---|---|
+| Chunk size | 1000 characters |
+| Chunk overlap | 200 characters |
 
 ### 4. Embedding Generation
 
-Each text chunk is converted into a numerical vector using:
+Each text chunk is converted into a numerical vector using the Sentence Transformers model:
 
-```text
-all-MiniLM-L6-v2
-```
+`all-MiniLM-L6-v2`
 
 ### 5. Vector Storage
 
-The generated embeddings and corresponding text are stored in ChromaDB.
-
-Page numbers are stored as metadata so that the retrieved information can be traced back to the original paper.
+ChromaDB stores the text chunks, embeddings, and page-number metadata for retrieval.
 
 ### 6. Question Processing
 
-When the user asks a question, the question is converted into an embedding using the same embedding model.
+When a user asks a question, PaperLens converts it into an embedding using the same embedding model.
 
-### 7. Similarity Retrieval
+### 7. Semantic Retrieval
 
-ChromaDB retrieves the most relevant document chunks based on semantic similarity.
+ChromaDB retrieves the most relevant text chunks by comparing the question embedding with the stored document embeddings.
 
-### 8. RAG Generation
+The current implementation retrieves up to five relevant chunks for question answering.
 
-The retrieved paper content is provided as context to Google Gemini.
+### 8. Answer Generation
 
-The model is instructed to answer using only the retrieved research-paper content.
+The retrieved content is supplied to the configured AI provider along with instructions to answer using the research paper content.
+
+- **Primary provider:** Groq, when configured and available
+- **Fallback provider:** Google Gemini
+
+The system attempts the Gemini models configured in the application if the Groq request fails.
 
 ### 9. Source Evidence
 
-PaperLens displays the retrieved passages and their page numbers, allowing users to verify the generated answer.
+PaperLens displays retrieved passages and their corresponding page numbers to help users verify the generated response.
+
+**Important:** Source passages indicate the retrieved evidence. They do not guarantee that every generated statement is fully supported by the paper.
 
 ## Explanation Modes
 
 ### Simple Mode
 
-Provides beginner-friendly explanations using simple English and minimal technical terminology.
+Provides beginner-friendly answers using simple English and minimal technical terminology.
+
+Suitable for students who want to understand research concepts easily.
 
 ### Technical Mode
 
-Provides more detailed explanations using appropriate research and computer science terminology.
+Provides detailed explanations using research terminology and appropriate computer science concepts.
 
-## Paper Summary
+Suitable for technical discussions, project reviews, and research analysis.
 
-PaperLens can automatically generate a structured summary containing:
+## Automatic Paper Summary
+
+PaperLens generates a structured summary with the following sections:
 
 1. Research Objective
 2. Problem Statement
@@ -152,28 +171,34 @@ PaperLens can automatically generate a structured summary containing:
 7. Limitations
 8. Conclusion
 
-If information is not available in the paper, the system reports:
+When the required information is absent from the supplied paper text, the model is instructed to report:
 
-```text
-Not specified in the paper.
-```
+`Not specified in the paper.`
+
+The summary is generated from the extracted paper text and is subject to the AI model's context and output limits.
 
 ## Technologies Used
 
-| Component            | Technology                     |
-| -------------------- | ------------------------------ |
-| Programming Language | Python                         |
-| User Interface       | Streamlit                      |
-| PDF Processing       | pypdf                          |
-| Text Splitting       | LangChain                      |
-| Embeddings           | Sentence Transformers          |
-| Embedding Model      | all-MiniLM-L6-v2               |
-| Vector Database      | ChromaDB                       |
-| Generative AI        | Google Gemini                  |
-| Retrieval Method     | Semantic Similarity            |
-| Architecture         | Retrieval-Augmented Generation |
+| Component | Technology |
+|---|---|
+| Programming Language | Python |
+| User Interface | Streamlit |
+| PDF Processing | pypdf |
+| Text Splitting | LangChain Text Splitters |
+| Embeddings | Sentence Transformers |
+| Embedding Model | all-MiniLM-L6-v2 |
+| Vector Database | ChromaDB |
+| Primary Generative AI | Groq |
+| Fallback Generative AI | Google Gemini |
+| Retrieval Method | Semantic Similarity |
+| Architecture | Retrieval-Augmented Generation |
+| Development Environment | Google Colab |
+| Version Control | Git and GitHub |
+| Deployment Option | Streamlit Community Cloud |
 
 ## Project Structure
+
+The following is a suggested repository structure. Include only files and folders that actually exist in your repository.
 
 ```text
 research_paper_explainer-assistant/
@@ -183,121 +208,161 @@ research_paper_explainer-assistant/
 ├── README.md
 ├── .gitignore
 │
-├── data/
-│
 ├── notebooks/
 │   └── research_paper_explainer.ipynb
 │
-├── src/
+├── screenshots/
 │
-└── screenshots/
+└── .streamlit/
+    └── secrets.toml  # Keep private; do not commit
 ```
 
-## Installation
+The notebook can be developed in Google Colab. The Streamlit application is run using `app.py` in an environment where the required dependencies are installed.
 
-Clone the repository:
+## Installation and Setup
+
+### Prerequisites
+
+- Python 3.10 or another Python version supported by the installed dependencies
+- A Groq API key for the primary provider, if using Groq
+- A Google Gemini API key for the fallback provider
+- Git, if cloning the repository
+
+### 1. Clone the Repository
+
+Replace the placeholder with your actual GitHub repository URL.
 
 ```bash
 git clone <your-github-repository-url>
-```
-
-Move into the project directory:
-
-```bash
 cd research_paper_explainer-assistant
 ```
 
-Install the required packages:
+### 2. Install Dependencies
+
+Install the packages listed in `requirements.txt`.
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run the application:
+### 3. Configure API Keys
+
+For local execution, create the file:
+
+`.streamlit/secrets.toml`
+
+Add the API keys you have configured:
+
+```toml
+GEMINI_API_KEY = "your_gemini_api_key"
+GROQ_API_KEY = "your_groq_api_key"
+```
+
+If you do not have a Groq key, you can omit `GROQ_API_KEY` and use Gemini directly.
+
+Never commit real API keys or `secrets.toml` to GitHub.
+
+### 4. Run the Streamlit Application
 
 ```bash
 streamlit run app.py
 ```
 
-## API Key Configuration
+Streamlit will display a local URL that you can open in your browser.
 
-PaperLens requires a Google Gemini API key.
+## API Configuration
 
-For local development, create:
+PaperLens supports two AI providers.
 
-```text
-.streamlit/secrets.toml
-```
+| Provider | Purpose |
+|---|---|
+| Groq | Primary provider when configured and a supported model is available |
+| Google Gemini | Fallback provider, or the main provider when Groq is unavailable |
 
-Add:
+### Groq Configuration
 
-```toml
-GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
-```
+Create an API key through the [Groq Console](https://console.groq.com/keys).
 
-For Streamlit Community Cloud, add the same key through the application's Secrets settings.
+### Gemini Configuration
 
-Do not upload API keys or `secrets.toml` to GitHub.
+Create a Gemini API key through [Google AI Studio](https://aistudio.google.com/apikey).
+
+For Streamlit Community Cloud, configure the keys through the app's **Settings → Secrets** interface.
+
+The application must have the corresponding API keys configured before those providers can be used. Provider availability, supported models, and API quotas can change.
 
 ## Example Questions
 
 Users can ask questions such as:
 
-```text
-What methodology is used in this paper?
-
-What dataset was used?
-
-What algorithms are used?
-
-What are the main results?
-
-What are the limitations?
-
-Explain the proposed approach in simple terms.
-
-How does the proposed model work?
-```
+- What problem does this paper solve?
+- What methodology is used in this research?
+- What dataset was used?
+- Which algorithms are used?
+- What are the main results?
+- What are the limitations of this research?
+- Explain the proposed approach in simple terms.
+- How does the proposed model work?
+- What are the contributions of this paper?
+- Summarize the research paper.
 
 ## Advantages
 
-* Reduces the time required to understand research papers
-* Enables natural-language interaction with academic documents
-* Provides evidence for generated answers
-* Supports both beginner-friendly and technical explanations
-* Uses semantic retrieval rather than simple keyword matching
-* Helps users quickly identify methodology, datasets, results, and limitations
+- Reduces the time needed to understand research papers
+- Supports natural-language interaction with academic documents
+- Uses semantic retrieval to find relevant passages
+- Provides page-level source references
+- Supports beginner-friendly and technical explanations
+- Generates structured summaries
+- Supports multiple AI providers
+- Can automatically try Gemini when Groq fails
 
 ## Limitations
 
-* Performance depends on the quality of extracted PDF text
-* Scanned/image-only PDFs may require OCR
-* The current vector database is maintained in memory
-* Very large research papers may require additional document management
-* Generated answers depend on the quality of retrieved context
-* Gemini API usage is subject to model/API quota limits
+- Extraction quality depends on the PDF's text structure.
+- Scanned or image-only PDFs may require OCR.
+- Semantic retrieval may miss relevant passages.
+- Generated answers may contain unsupported interpretations despite source-grounding instructions.
+- Page references identify retrieved passages, not necessarily every source for every claim.
+- Large papers may exceed practical context or processing limits.
+- AI responses depend on provider availability, supported models, and API quotas.
+- The current in-memory ChromaDB client does not provide durable vector storage across application restarts.
+- Chat history stored in Streamlit session state may not persist across sessions.
 
 ## Future Enhancements
 
-* OCR support for scanned research papers
-* Persistent vector database
-* Multi-paper comparison
-* Citation-aware answers
-* Automatic figure and table understanding
-* Research-paper recommendation
-* Export summaries as PDF
-* Authentication and user accounts
-* Persistent chat history
-* Support for additional document formats
+- OCR support for scanned research papers
+- Persistent vector database storage
+- Persistent chat history and user accounts
+- Multi-paper comparison
+- More precise claim-level citations
+- Improved retrieval using reranking and hybrid search
+- Automatic figure and table understanding
+- Export summaries as PDF
+- Support for additional document formats
+- Multilingual paper explanations
+- More robust evaluation of answer relevance and factual correctness
 
 ## Deployment
 
-The application can be deployed using Streamlit Community Cloud.
+PaperLens can be deployed using [Streamlit Community Cloud](https://share.streamlit.io/).
 
-The Gemini API key should be stored securely using Streamlit Secrets rather than inside the source code.
+General deployment steps:
 
-## Project
+1. Push the application source code to GitHub.
+2. Create a Streamlit Community Cloud app connected to the repository.
+3. Select the correct entry point, such as `app.py`.
+4. Add the required API keys under the app's Secrets settings.
+5. Deploy and test PDF upload, retrieval, summarization, and question answering.
 
-**PaperLens — Research Paper Explainer Assistant**
+Do not upload API keys, private research papers, or `secrets.toml` to a public repository.
 
-A Generative AI and Retrieval-Augmented Generation application for interactive research paper understanding.
+## Project Information
+
+**Project Title:** PaperLens — Research Paper Explainer Assistant  
+**Team Name:** Smart Work  
+**Domain:** Generative AI and Natural Language Processing  
+**Core Approach:** Retrieval-Augmented Generation (RAG)  
+**Interface:** Streamlit
+
+PaperLens aims to make academic research easier to explore by combining semantic retrieval, generative AI, and source-page evidence in an interactive research assistant.
