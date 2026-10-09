@@ -1,6 +1,25 @@
+
+# Secrets and API keys
 .env
+.env.*
+!.env.example
 .streamlit/secrets.toml
+
+# Python cache
 __pycache__/
-.venv/
-*.pyc
+*.py[cod]
+
+# Uploaded research papers
 *.pdf
+
+# Local ChromaDB data (if persistent storage is used)
+chroma_db/
+chroma.sqlite3
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Operating system files
+.DS_Store
+Thumbs.db
