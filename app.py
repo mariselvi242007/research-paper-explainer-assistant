@@ -1,4 +1,3 @@
-
 import html
 import re
 import uuid
@@ -249,13 +248,13 @@ header[data-testid="stHeader"] {
     box-shadow: 0 0 0 1px #2F5D8A !important;
 }
 
+
 /* ========================================================
-   CHAT INPUT — NEUTRAL BORDER, NO RED/BLUE OUTLINE
+   CHAT INPUT — ONLY CHANGE: NEUTRAL BORDER, NO RED OUTLINE
    ======================================================== */
 
+/* Outer typing bar */
 [data-testid="stChatInput"] {
-    visibility: visible !important;
-    opacity: 1 !important;
     background: #FFFFFF !important;
     border: 1px solid #D5DDE6 !important;
     border-radius: 18px !important;
@@ -264,6 +263,7 @@ header[data-testid="stHeader"] {
     transition: none !important;
 }
 
+/* Keep the same neutral border while hovering or typing */
 [data-testid="stChatInput"]:hover,
 [data-testid="stChatInput"]:focus,
 [data-testid="stChatInput"]:focus-within {
@@ -273,11 +273,12 @@ header[data-testid="stHeader"] {
     outline: none !important;
 }
 
-/* Remove nested input outlines and focus rings */
+/* Remove inner textarea and input focus borders */
 [data-testid="stChatInput"] textarea,
 [data-testid="stChatInput"] textarea:focus,
 [data-testid="stChatInput"] textarea:focus-visible,
 [data-testid="stChatInput"] [data-baseweb="textarea"],
+[data-testid="stChatInput"] [data-baseweb="textarea"]:focus,
 [data-testid="stChatInput"] [data-baseweb="textarea"]:focus-within,
 [data-testid="stChatInput"] [data-baseweb="base-input"],
 [data-testid="stChatInput"] [data-baseweb="base-input"]:focus-within {
@@ -287,7 +288,7 @@ header[data-testid="stHeader"] {
     box-shadow: none !important;
 }
 
-/* Neutralize any inner focus styling */
+/* Remove nested focus rings without affecting other inputs */
 [data-testid="stChatInput"] *:focus,
 [data-testid="stChatInput"] *:focus-visible {
     outline: none !important;
@@ -298,26 +299,24 @@ header[data-testid="stHeader"] {
     caret-color: #2F5D8A !important;
 }
 
+
 /* ========================================================
-   SEND BUTTON — BLUE CIRCLE AND CLEAN WHITE ARROW
+   SEND BUTTON — ONLY CHANGE: BLUE CIRCLE WITH WHITE UP ARROW
    ======================================================== */
 
 [data-testid="stChatInputSubmitButton"] {
+    position: relative !important;
     background: #2F5D8A !important;
     color: #FFFFFF !important;
-
     width: 38px !important;
     height: 38px !important;
     min-width: 38px !important;
     min-height: 38px !important;
-
     padding: 0 !important;
     margin: 0 4px !important;
-
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-
     border: none !important;
     border-radius: 50% !important;
     box-shadow: none !important;
@@ -325,7 +324,12 @@ header[data-testid="stHeader"] {
     overflow: hidden !important;
 }
 
-/* Remove square backgrounds around the icon */
+/* Remove the old icon completely */
+[data-testid="stChatInputSubmitButton"] svg {
+    display: none !important;
+}
+
+/* Keep inner wrappers transparent */
 [data-testid="stChatInputSubmitButton"] > *,
 [data-testid="stChatInputSubmitButton"] span,
 [data-testid="stChatInputSubmitButton"] div {
@@ -335,24 +339,33 @@ header[data-testid="stHeader"] {
     outline: none !important;
 }
 
-/* Arrow shape and color */
-[data-testid="stChatInputSubmitButton"] svg {
-    display: block !important;
-    width: 20px !important;
-    height: 20px !important;
-    background: transparent !important;
-    color: #FFFFFF !important;
-    fill: none !important;
-    stroke: #FFFFFF !important;
-    border: none !important;
-    box-shadow: none !important;
+/* White vertical arrow shaft */
+[data-testid="stChatInputSubmitButton"]::before {
+    content: "";
+    position: absolute;
+    width: 2px;
+    height: 13px;
+    background: #FFFFFF;
+    left: 50%;
+    top: 15px;
+    transform: translateX(-50%);
+    border-radius: 2px;
+    pointer-events: none;
 }
 
-/* Ensure arrow strokes remain white */
-[data-testid="stChatInputSubmitButton"] svg path,
-[data-testid="stChatInputSubmitButton"] svg line,
-[data-testid="stChatInputSubmitButton"] svg polyline {
-    stroke: #FFFFFF !important;
+/* White arrow head */
+[data-testid="stChatInputSubmitButton"]::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-left: 2px solid #FFFFFF;
+    border-top: 2px solid #FFFFFF;
+    left: 50%;
+    top: 12px;
+    transform: translateX(-50%) rotate(45deg);
+    box-sizing: border-box;
+    pointer-events: none;
 }
 
 /* Hover */
@@ -360,7 +373,7 @@ header[data-testid="stHeader"] {
     background: #254B72 !important;
 }
 
-/* No button focus ring */
+/* No focus ring on the send button */
 [data-testid="stChatInputSubmitButton"]:focus,
 [data-testid="stChatInputSubmitButton"]:focus-visible,
 [data-testid="stChatInputSubmitButton"]:active {
@@ -368,6 +381,7 @@ header[data-testid="stHeader"] {
     box-shadow: none !important;
     border: none !important;
 }
+
 
 /* Paper title */
 .pl-title {
