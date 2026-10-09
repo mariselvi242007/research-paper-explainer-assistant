@@ -78,12 +78,14 @@ st.markdown(
     font-family: 'Public Sans', system-ui, sans-serif;
 }}
 
-/* ---- Hide Streamlit's own top-right toolbar and footer ---- */
+/* ---- Hide Streamlit's menu, deploy button and footer ----
+   NOTE: we do NOT hide [data-testid="stToolbar"] itself, because
+   the "open sidebar" arrow lives inside it in newer versions. */
 footer,
 #MainMenu,
-[data-testid="stToolbar"],
 [data-testid="stAppDeployButton"],
 [data-testid="stMainMenu"],
+[data-testid="stToolbarActions"],
 [data-testid="stStatusWidget"],
 [data-testid="stDecoration"],
 .stDeployButton {{
@@ -92,6 +94,22 @@ footer,
 
 header[data-testid="stHeader"] {{
     background: transparent;
+}}
+
+/* ---- Always keep the sidebar open/close arrows visible ---- */
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapseButton"] {{
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}}
+
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="collapsedControl"] {{
+    z-index: 999999;
 }}
 
 .block-container {{
@@ -103,8 +121,9 @@ header[data-testid="stHeader"] {{
 /* ---- Typography ---- */
 .pl-logo {{
     font: 600 1.7rem 'Newsreader', Georgia, serif;
-    margin-bottom: .4rem;
+    margin: 0;
     color: {BLUE};
+    line-height: 1.2;
 }}
 
 .pl-section {{
@@ -113,7 +132,8 @@ header[data-testid="stHeader"] {{
     letter-spacing: .08em;
     text-transform: uppercase;
     color: #7A8899;
-    margin: 1.2rem 0 .4rem 0;
+    margin: .9rem 0 .1rem 0;
+    padding-left: .2rem;
 }}
 
 .pl-title {{
@@ -194,13 +214,41 @@ header[data-testid="stHeader"] {{
     background: #F7FAFD;
 }}
 
-/* ---- Sidebar ---- */
+/* ---- Sidebar layout and spacing ---- */
 [data-testid="stSidebar"] {{
     background: #F7F9FC;
 }}
 
+[data-testid="stSidebar"] [data-testid="stSidebarHeader"] {{
+    padding: .75rem 1rem .25rem 1rem;
+    height: auto;
+    min-height: 0;
+}}
+
+[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {{
+    padding: 0 1rem 1.5rem 1rem;
+}}
+
+/* Even vertical rhythm for everything in the sidebar */
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{
+    gap: .45rem;
+}}
+
 [data-testid="stSidebar"] button {{
     border-radius: 8px;
+    min-height: 2.35rem;
+    padding-top: .3rem;
+    padding-bottom: .3rem;
+}}
+
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {{
+    margin-top: -.1rem;
+    padding-left: .2rem;
+    line-height: 1.35;
+}}
+
+[data-testid="stSidebar"] [data-testid="stTextInput"] {{
+    margin-bottom: .1rem;
 }}
 
 .stButton button {{
@@ -229,6 +277,10 @@ button[kind="secondary"]:hover,
 }}
 
 /* ---- Chat lists (Favourites and Recents) ---- */
+[class*="st-key-chatlist"] [data-testid="stVerticalBlock"] {{
+    gap: .15rem !important;
+}}
+
 [class*="st-key-chatlist"] button {{
     justify-content: flex-start !important;
     text-align: left !important;
@@ -258,6 +310,10 @@ button[kind="secondary"]:hover,
 }}
 
 /* ---- Chat actions: quiet, text-style buttons ---- */
+.st-key-chat_actions [data-testid="stVerticalBlock"] {{
+    gap: .15rem !important;
+}}
+
 .st-key-chat_actions button {{
     justify-content: flex-start !important;
     background: transparent !important;
@@ -270,6 +326,19 @@ button[kind="secondary"]:hover,
 .st-key-chat_actions button:hover {{
     background: #EAF0F7 !important;
     color: {BLUE} !important;
+}}
+
+/* Keep the Delete / Cancel confirm buttons bordered */
+.st-key-chat_actions [data-testid="stHorizontalBlock"] button {{
+    justify-content: center !important;
+    border: 1px solid #D5DEE9 !important;
+}}
+
+.st-key-chat_actions [data-testid="stHorizontalBlock"] button[kind="primary"],
+.st-key-chat_actions [data-testid="stHorizontalBlock"] [data-testid="stBaseButton-primary"] {{
+    background: {BLUE} !important;
+    border-color: {BLUE} !important;
+    color: #FFFFFF !important;
 }}
 </style>
 """,
@@ -486,12 +555,19 @@ def process_uploaded_files(files):
     """Process several PDFs. Returns (papers, error_messages)."""
     papers = []
     errors = []
+    seen = set()
 
     for uploaded in files:
         try:
-            papers.append(
-                process_pdf(uploaded.getvalue(), uploaded.name)
-            )
+            paper = process_pdf(uploaded.getvalue(), uploaded.name)
+
+            # Skip the same PDF if it was selected twice
+            if paper["id"] in seen:
+                continue
+
+            seen.add(paper["id"])
+            papers.append(paper)
+
         except Exception as e:
             errors.append(f"{uploaded.name}: {e}")
 
@@ -1116,491 +1192,130 @@ def section(label):
     )
 
 
+def read_chat_submission(submitted):
+    """Return (text, attached_files) from st.chat_input output."""
+    if isinstance(submitted, str):
+        return submitted, []
+
+    text = getattr(submitted, "text", "") or ""
+    files = list(getattr(submitted, "files", []) or [])
+
+    return text, files
+
+
+def chat_input_with_files(placeholder, key):
+    """Chat input that accepts PDFs when Streamlit supports it."""
+    try:
+        return st.chat_input(
+            placeholder,
+            accept_file="multiple",
+            file_type=["pdf"],
+            key=key,
+        )
+    except TypeError:
+        # Older Streamlit versions: text only.
+        return st.chat_input(placeholder, key=key)
+
+
 # ============================================================
 # 13. SIDEBAR
 # ============================================================
 
+def chat_button(chat_id, prefix):
+    chat = st.session_state.chats[chat_id]
+
+    title = chat["title"]
+
+    if len(title) > 30:
+        title = title[:27] + "..."
+
     is_current = chat_id == st.session_state.current_chat_id
- 
+
     if st.button(
         title,
         key=f"{prefix}_{chat_id}",
         use_container_width=True,
         type="primary" if is_current else "secondary",
+        help=(
+            f"{chat['title']} · "
+            f"{len(chat['history'])} messages"
+        ),
     ):
         open_chat(chat_id)
         st.rerun()
- 
- 
+
+
 with st.sidebar:
+
     st.markdown(
-        '<div class="pl-logo"><div class="pl-logo-mark">P</div>'
-        '<div class="pl-logo-name">PaperLens</div></div>',
+        '<div class="pl-logo">PaperLens</div>',
         unsafe_allow_html=True,
     )
- 
-    # Answer style, at the top
-    st.markdown('<div class="pl-section">Answer style</div>', unsafe_allow_html=True)
-    st.segmented_control(
-        "Answer style",
-        MODES,
-        key="explanation_mode",
-        label_visibility="collapsed",
-    )
-    active_mode = st.session_state.explanation_mode or "Simple"
-    st.markdown(f'<div class="pl-hint">{MODE_HINTS[active_mode]}</div>', unsafe_allow_html=True)
- 
-    st.write("")
-    if st.button("New chat", key="new_chat_btn", use_container_width=True):
+
+    # --- New chat ---
+    if st.button(
+        "New chat",
+        key="new_chat_btn",
+        icon=":material/add:",
+        type="primary",
+        use_container_width=True,
+    ):
         new_chat()
         st.rerun()
- 
-    # Pinned
-    pinned_ids = [c for c in st.session_state.pinned if c in st.session_state.chats]
-    if pinned_ids:
-        st.markdown('<div class="pl-section">Pinned</div>', unsafe_allow_html=True)
-        for chat_id in pinned_ids:
-            chat_button(chat_id, "pinned")
- 
-    # Recents / history
-    st.markdown('<div class="pl-section">Recents</div>', unsafe_allow_html=True)
-    recent_ids = [
-        c
-        for c in st.session_state.recents
-        if c in st.session_state.chats and c not in st.session_state.pinned
-    ]
-    if recent_ids:
-        for chat_id in recent_ids:
-            chat_button(chat_id, "recent")
-    else:
-        st.caption("Your chats will appear here.")
- 
-    # Options for the open chat
-    current = get_current_chat()
-    if current:
-        st.markdown('<div class="pl-section">This chat</div>', unsafe_allow_html=True)
-        c1, c2, c3 = st.columns(3)
- 
-        with c1:
-            is_pinned = current["id"] in st.session_state.pinned
-            if st.button("Unpin" if is_pinned else "Pin", use_container_width=True):
-                toggle_pin(current["id"])
-                st.rerun()
- 
-        with c2:
-            if st.button("Clear", use_container_width=True):
-                current["history"] = []
-                st.rerun()
- 
-        with c3:
-            if st.button("Delete", use_container_width=True):
-                delete_chat(current["id"])
-                st.rerun()
- 
 
+    # --- Answer style ---
+    section("Answer style")
 
+    active_mode = st.session_state.explanation_mode or "Simple"
 
-# ============================================================
-# 14. MAIN: UPLOAD SCREEN
-# ============================================================
+    mode_cols = st.columns(2, gap="small")
 
-current_chat = get_current_chat()
-
-if current_chat is None:
-
-    st.markdown(
-        '<div class="pl-hero-title">'
-        'Ask questions about any research paper.'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<div class="pl-hero-sub">'
-        'Upload one or more PDFs and chat with them. '
-        'Add several papers to compare and relate them. '
-        'Answers include references to source pages.'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    uploaded_files = st.file_uploader(
-        "Upload research papers",
-        type=["pdf"],
-        accept_multiple_files=True,
-        key=f"pdf_upload_{st.session_state.upload_key}",
-    )
-
-    if uploaded_files:
-        count = len(uploaded_files)
-
-        if st.button(
-            f"Start chat with {count} paper{'s' if count != 1 else ''}",
-            key="start_chat",
-            type="primary",
-        ):
-            started = False
-
-            with st.spinner("Reading and indexing your papers..."):
-                papers, errors = process_uploaded_files(uploaded_files)
-
-            for error in errors:
-                st.error(f"Unable to process {error}")
-
-            if papers:
-                create_chat(papers)
-                started = True
-
-            if started and not errors:
-                st.rerun()
-
-
-# ============================================================
-# 15. MAIN: CHAT SCREEN
-# ============================================================
-
-else:
-
-    papers = current_chat["papers"]
-    history = current_chat["history"]
-    multi = len(papers) > 1
-
-    mode = st.session_state.explanation_mode or "Simple"
-
-    # One-time notices (e.g. after adding papers)
-    if st.session_state.notice:
-        level, message = st.session_state.notice
-        st.session_state.notice = None
-
-        if level == "error":
-            st.error(message)
-        else:
-            st.success(message)
-
-    # ---- Header ----
-    total_pages = sum(len(p["pages"]) for p in papers)
-    total_words = sum(
-        len(page["text"].split())
-        for paper in papers
-        for page in paper["pages"]
-    )
-
-    paper_label = (
-        f"{len(papers)} papers" if multi else "1 paper"
-    )
-
-    st.markdown(
-        (
-            '<p class="pl-title">'
-            f'{html.escape(current_chat["title"])}'
-            '</p>'
-            '<p class="pl-meta">'
-            f'{paper_label} · {total_pages} pages · '
-            f'{total_words:,} words · {mode} answers'
-            '</p>'
-        ),
-        unsafe_allow_html=True,
-    )
-
-    if multi:
-        st.caption(
-            "Papers in this chat: "
-            + " · ".join(p["name"] for p in papers)
-        )
-
-    # ---- Action row: Summarize, Favourite, Share ----
-    is_fav = current_chat["id"] in st.session_state.pinned
-
-    _, sum_col, fav_col, share_col = st.columns([2.2, 1.6, 1.4, 1.1])
-
-    with sum_col:
-        st.button(
-            "Summarize papers" if multi else "Summarize paper",
-            key="top_summary",
-            on_click=ask_summary,
-            args=(multi,),
-            use_container_width=True,
-        )
-
-    with fav_col:
-        st.button(
-            "Favourited" if is_fav else "Favourite",
-            key="top_fav",
-            icon=":material/star:",
-            on_click=toggle_pin,
-            args=(current_chat["id"],),
-            type="primary" if is_fav else "secondary",
-            use_container_width=True,
-        )
-
-    with share_col:
-        with st.popover(
-            "Share",
-            icon=":material/share:",
-            use_container_width=True,
-        ):
-            if not history:
-                st.caption(
-                    "Ask a question first, then share the conversation."
-                )
-            else:
-                full_text = build_share_text(current_chat)
-                short_text = short_share_text(full_text)
-                encoded = quote(short_text)
-                subject = quote(f"PaperLens: {current_chat['title']}")
-
-                st.link_button(
-                    "WhatsApp",
-                    f"https://wa.me/?text={encoded}",
-                    use_container_width=True,
-                )
-
-                st.link_button(
-                    "Telegram",
-                    f"https://t.me/share/url?url=%20&text={encoded}",
-                    use_container_width=True,
-                )
-
-                st.link_button(
-                    "Email",
-                    f"mailto:?subject={subject}&body={encoded}",
-                    use_container_width=True,
-                )
-
-                safe_name = re.sub(
-                    r"[^A-Za-z0-9_-]+", "_", current_chat["title"]
-                ).strip("_") or "paperlens_chat"
-
-                st.download_button(
-                    "Download as text file",
-                    data=full_text,
-                    file_name=f"{safe_name}.txt",
-                    mime="text/plain",
-                    use_container_width=True,
-                )
-
-                st.caption("Copy the full conversation:")
-                st.code(full_text, language=None)
-
-    # ---- Add more papers ----
-    with st.expander("Add more papers to compare"):
-        extra_files = st.file_uploader(
-            "Add PDFs",
-            type=["pdf"],
-            accept_multiple_files=True,
-            key=f"add_upload_{st.session_state.add_key}",
-            label_visibility="collapsed",
-        )
-
-        if extra_files:
-            if st.button(
-                f"Add {len(extra_files)} paper"
-                f"{'s' if len(extra_files) != 1 else ''} to this chat",
-                key="add_papers_btn",
-                type="primary",
-            ):
-                with st.spinner("Reading and indexing..."):
-                    new_papers, errors = process_uploaded_files(
-                        extra_files
-                    )
-
-                added = add_papers_to_chat(current_chat, new_papers)
-
-                st.session_state.add_key += 1
-
-                if errors:
-                    st.session_state.notice = (
-                        "error",
-                        "Could not add: " + "; ".join(errors),
-                    )
-                else:
-                    st.session_state.notice = (
-                        "success",
-                        f"Added {added} paper"
-                        f"{'s' if added != 1 else ''}. "
-                        "You can now ask questions across all papers.",
-                    )
-
-                st.rerun()
-
-    # ---- Empty state and suggestions ----
-    pending = st.session_state.pending
-
-    if not history and not pending:
-
-        st.markdown(
-            '<div class="pl-empty">'
-            '<b>What would you like to know?</b>'
-            '<span>Ask a question below, or try one of these.</span>'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-        if multi:
-            suggestions = [
-                "How are these papers related?",
-                "Compare the methods used in these papers.",
-                "What are the key differences in their results?",
-            ]
-        else:
-            suggestions = [
-                "What problem does this paper solve?",
-                "Explain the method step by step.",
-                "What are the main results and limitations?",
-            ]
-
-        for i, suggestion in enumerate(suggestions):
+    for col, mode_name in zip(mode_cols, MODES):
+        with col:
             st.button(
-                suggestion,
-                key=f"suggest_{i}",
-                on_click=ask_suggestion,
-                args=(suggestion,),
+                mode_name,
+                key=f"mode_{mode_name}",
+                on_click=set_mode,
+                args=(mode_name,),
                 use_container_width=True,
+                type=(
+                    "primary"
+                    if mode_name == active_mode
+                    else "secondary"
+                ),
             )
 
-    # ---- Chat history: questions right, answers left ----
-    for item in history:
+    st.caption(MODE_HINTS[active_mode])
 
-        render_user_bubble(item["question"])
+    # --- Favourites ---
+    pinned_ids = [
+        chat_id
+        for chat_id in st.session_state.pinned
+        if chat_id in st.session_state.chats
+    ]
 
-        with st.container(border=True):
-            st.markdown(item["answer"])
+    if pinned_ids:
+        section("Favourites")
 
-            metadata = item.get("metadata", [])
-            chunks = item.get("chunks", [])
-            distances = item.get("distances", [])
+        with st.container(key="chatlist_fav"):
+            for chat_id in pinned_ids:
+                chat_button(chat_id, "pinned")
 
-            citation_line = format_citations(metadata)
+    # --- Recents ---
+    section("Recents")
 
-            if citation_line:
-                st.markdown(
-                    f'<div class="pl-cites">{citation_line}</div>',
-                    unsafe_allow_html=True,
-                )
-
-            if chunks:
-                with st.expander(
-                    f"Sources ({len(chunks)} passages)"
-                ):
-                    for i, chunk in enumerate(chunks):
-                        meta = metadata[i] if i < len(metadata) else {}
-                        page_number = meta.get("page", "?")
-                        paper_name = meta.get("paper", "")
-
-                        distance = (
-                            distances[i]
-                            if i < len(distances)
-                            else None
-                        )
-
-                        label = f"**Page {page_number}**"
-
-                        if multi and paper_name:
-                            label = f"**{paper_name}** · page {page_number}"
-
-                        if distance is not None:
-                            label += f" · distance {distance:.3f}"
-
-                        st.markdown(label)
-                        st.caption(chunk)
-
-    # ---- Process pending question or summary ----
-    if pending:
-
-        render_user_bubble(pending["question"])
-
-        failed = False
-        result = None
-
-        with st.container(border=True):
-            with st.spinner(
-                "Reading the papers and generating your answer..."
-            ):
-                try:
-                    if pending["kind"] == "summary":
-                        result = (
-                            generate_summary(papers),
-                            [],
-                            [],
-                            [],
-                        )
-                    else:
-                        result = ask_question(
-                            pending["question"],
-                            papers,
-                            mode,
-                        )
-
-                except Exception as e:
-                    failed = True
-
-                    if isinstance(e, QuotaExceeded):
-                        st.warning(friendly_error(e))
-                    else:
-                        st.error(friendly_error(e))
-
-        if failed:
-            st.session_state.pending = None
-
-        elif result is not None:
-            answer, chunks, metadata, distances = result
-
-            history.append({
-                "question": pending["question"],
-                "answer": answer,
-                "chunks": chunks,
-                "metadata": metadata,
-                "distances": distances,
-            })
-
-            move_to_top(current_chat["id"])
-
-            st.session_state.pending = None
-
-            st.rerun()
-
-    # ---- Chat input (with multi-PDF attach when supported) ----
-    try:
-        submitted = st.chat_input(
-            "Ask about your papers, or attach PDFs to add them...",
-            accept_file="multiple",
-            file_type=["pdf"],
+    recent_ids = [
+        chat_id
+        for chat_id in st.session_state.recents
+        if (
+            chat_id in st.session_state.chats
+            and chat_id not in st.session_state.pinned
         )
-    except TypeError:
-        # Older Streamlit versions: text only.
-        submitted = st.chat_input("Ask about your papers...")
+    ]
 
-    if submitted:
-
-        if isinstance(submitted, str):
-            text = submitted
-            attached = []
-        else:
-            text = getattr(submitted, "text", "") or ""
-            attached = list(getattr(submitted, "files", []) or [])
-
-        if attached:
-            with st.spinner("Reading and indexing attached papers..."):
-                new_papers, errors = process_uploaded_files(attached)
-
-            added = add_papers_to_chat(current_chat, new_papers)
-
-            if errors:
-                st.session_state.notice = (
-                    "error",
-                    "Could not add: " + "; ".join(errors),
-                )
-            elif added:
-                st.session_state.notice = (
-                    "success",
-                    f"Added {added} paper{'s' if added != 1 else ''} "
-                    "to this chat.",
-                )
-
-        if text.strip():
-            st.session_state.pending = {
-                "kind": "question",
-                "question": text.strip(),
-            }
-
-        st.rerun()
+    if len(recent_ids) > 4:
+        search = st.text_input(
+            "Search chats",
+            placeholder="Search chats",
+            label_visibility="collapsed",
+            key="chat_search",
